@@ -72,6 +72,14 @@
       <div class="note">
         点击上方按钮开始扫描。完成后会自动将 scanId 与 subject 上报到表格。
       </div>
+
+      <!-- 可见性兜底：若按钮未显示，则直接嵌入扫描器 -->
+      <div class="field" style="margin-top: 2rem">
+        <div class="note">如果上方按钮未出现，请使用下方内嵌扫描器：</div>
+        <volumental-measurement-embedded
+          id="vmEmbed"
+        ></volumental-measurement-embedded>
+      </div>
     </div>
 
     <script>
@@ -82,15 +90,26 @@
       const subjectInput = document.getElementById("subjectInput");
       const localeInput = document.getElementById("localeInput");
       const vmButton = document.getElementById("vmButton");
+      const vmEmbed = document.getElementById("vmEmbed");
 
       // 根据输入动态设置组件属性
       function syncAttributes() {
         const subject = subjectInput.value.trim();
         const locale = localeInput.value.trim();
-        if (subject) vmButton.setAttribute("subject", subject);
-        else vmButton.removeAttribute("subject");
-        if (locale) vmButton.setAttribute("locale", locale);
-        else vmButton.removeAttribute("locale");
+        if (subject) {
+          vmButton.setAttribute("subject", subject);
+          vmEmbed.setAttribute("subject", subject);
+        } else {
+          vmButton.removeAttribute("subject");
+          vmEmbed.removeAttribute("subject");
+        }
+        if (locale) {
+          vmButton.setAttribute("locale", locale);
+          vmEmbed.setAttribute("locale", locale);
+        } else {
+          vmButton.removeAttribute("locale");
+          vmEmbed.removeAttribute("locale");
+        }
       }
       subjectInput.addEventListener("input", syncAttributes);
       localeInput.addEventListener("input", syncAttributes);
@@ -104,6 +123,8 @@
       }
 
       onSdkReady(() => {
+        // 初始同步一次属性
+        syncAttributes();
         // 当用户成功完成扫描，会触发该事件，拿到 scanId
         window.Volumental.on("volumental:on-measurement", (data) => {
           // 兼容可能的结构差异
