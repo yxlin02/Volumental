@@ -40,6 +40,12 @@
 
     <div class="wrap">
       <div class="note" id="sdkStatus">Loading Volumental SDK…</div>
+      <div class="note" id="elementStatus"></div>
+      <volumental-measurement
+        id="vmBtn"
+        variant="outline"
+        measurement-on-widget="true"
+      ></volumental-measurement>
       <volumental-measurement-embedded
         id="vm"
       ></volumental-measurement-embedded>
@@ -53,7 +59,8 @@
 
       function onReady(fn) {
         if (window.Volumental) fn();
-        else window.addEventListener("volumental:sdk-ready", fn, { once: true });
+        else
+          window.addEventListener("volumental:sdk-ready", fn, { once: true });
       }
 
       // 动态插入 SDK，带错误处理
@@ -64,11 +71,13 @@
         s.setAttribute("data-client-id", CLIENT_ID);
         s.onload = () => {
           const statusEl = document.getElementById("sdkStatus");
-          if (statusEl) statusEl.textContent = "SDK script loaded, waiting for init…";
+          if (statusEl)
+            statusEl.textContent = "SDK script loaded, waiting for init…";
         };
         s.onerror = () => {
           const statusEl = document.getElementById("sdkStatus");
-          if (statusEl) statusEl.textContent = "SDK 脚本加载失败（可能被网络或策略拦截）。";
+          if (statusEl)
+            statusEl.textContent = "SDK 脚本加载失败（可能被网络或策略拦截）。";
         };
         document.body.appendChild(s);
       })();
@@ -76,6 +85,15 @@
       onReady(() => {
         const statusEl = document.getElementById("sdkStatus");
         if (statusEl) statusEl.textContent = "SDK loaded. You can scan now.";
+
+        // 显示组件注册状态
+        const elStatus = document.getElementById("elementStatus");
+        const hasBtn = !!customElements.get("volumental-measurement");
+        const hasEmbed = !!customElements.get(
+          "volumental-measurement-embedded"
+        );
+        if (elStatus)
+          elStatus.textContent = `components: button=${hasBtn}, embedded=${hasEmbed}`;
 
         window.Volumental.on("volumental:on-measurement", (data) => {
           const scanId = data?.scanId || data?.scan?.id || data?.id || "";
@@ -107,7 +125,8 @@
         if (!window.Volumental) {
           const statusEl = document.getElementById("sdkStatus");
           if (statusEl)
-            statusEl.textContent = "SDK 未完成初始化：可能 1) 网络阻断 2) 站点域名未在 Volumental 客户端允许列表 3) 浏览器限制。";
+            statusEl.textContent =
+              "SDK 未完成初始化：可能 1) 网络阻断 2) 站点域名未在 Volumental 客户端允许列表 3) 浏览器限制。";
         }
       }, 3000);
     </script>
