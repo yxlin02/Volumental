@@ -2,175 +2,82 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width,initial-scale=1,viewport-fit=cover"
-    />
-    <title>Foot Scan Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Volumental Collector (Minimal)</title>
     <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+      }
       body {
         font-family: -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial,
           "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
           sans-serif;
-        margin: 0;
-        padding: 2rem;
+        background: #fff;
       }
-      .container {
-        max-width: 640px;
+      .wrap {
+        max-width: 720px;
         margin: 0 auto;
+        padding: 16px;
       }
-      .field {
-        margin: 1rem 0;
-      }
-      input,
-      button {
-        font-size: 16px;
-        padding: 0.8rem;
-        width: 100%;
-        box-sizing: border-box;
-      }
-      volumental-measurement {
+      volumental-measurement-embedded {
         display: block;
-        margin-top: 1rem;
+        min-height: 560px; /* 占位，确保可见 */
+        width: 100%;
+        border: 1px solid #eee;
+        border-radius: 8px;
       }
       .note {
         color: #666;
         font-size: 14px;
-        margin-top: 0.5rem;
-      }
-      /* 让内嵌扫描器在未初始化前也占位可见 */
-      volumental-measurement-embedded {
-        display: block;
-        min-height: 520px;
-        width: 100%;
-        border: 1px dashed #ddd;
-        border-radius: 8px;
+        margin: 8px 0;
       }
     </style>
   </head>
   <body>
-    <!-- Volumental SDK（文档要求）：把 client id 放到 data-client-id -->
+    <!-- 只保留 SDK 与内嵌扫描器，尽量接近官方 collector 页面 -->
     <script
       async
       src="https://js.volumental.com/sdk/v1/volumental.js"
       data-client-id="wb7ILNMFUGQXq9Lbo6TwkZk6yyFMXlzX"
     ></script>
 
-    <div class="container">
-      <h2>Foot Scan Test</h2>
-
-      <div class="field">
-        <label>Subject（用户唯一标识）</label>
-        <input id="subjectInput" placeholder="如: phone/email/uuid" />
-      </div>
-
-      <div class="field">
-        <label>Locale（可选）</label>
-        <input id="localeInput" placeholder="如: en, en-GB, zh, fr ..." />
-        <div class="note">不填则使用浏览器语言；支持的语言见文档。</div>
-      </div>
-
-      <!-- Volumental 测量按钮组件（文档示例） -->
-      <volumental-measurement
-        id="vmButton"
-        variant="outline"
-        measurement-on-widget="true"
-      ></volumental-measurement>
-
-      <div class="note">
-        点击上方按钮开始扫描。完成后会自动将 scanId 与 subject 上报到表格。
-      </div>
-
-      <!-- 可见性兜底：若按钮未显示，则直接嵌入扫描器 -->
-      <div class="field" style="margin-top: 2rem">
-        <div class="note">如果上方按钮未出现，请使用下方内嵌扫描器：</div>
-        <volumental-measurement-embedded
-          id="vmEmbed"
-        ></volumental-measurement-embedded>
-        <div class="field">
-          <button id="fallbackStartBtn">开始扫描（兜底按钮）</button>
-          <div id="sdkStatus" class="note"></div>
-        </div>
-      </div>
+    <div class="wrap">
+      <div class="note" id="sdkStatus">Loading Volumental SDK…</div>
+      <volumental-measurement-embedded
+        id="vm"
+      ></volumental-measurement-embedded>
     </div>
 
     <script>
-      // 你的 Apps Script Web App URL（/exec）
       const LOG_ENDPOINT =
         "https://script.google.com/macros/s/AKfycbzNSJAJ6JAO2Cx8m3wzev0DYXWYcXrUyIVMdSbW6BOiB4LP46BW5Rsyut9qT_qn9zE0/exec";
 
-      const subjectInput = document.getElementById("subjectInput");
-      const localeInput = document.getElementById("localeInput");
-      const vmButton = document.getElementById("vmButton");
-      const vmEmbed = document.getElementById("vmEmbed");
-      const fallbackStartBtn = document.getElementById("fallbackStartBtn");
-      const sdkStatus = document.getElementById("sdkStatus");
-
-      // 根据输入动态设置组件属性
-      function syncAttributes() {
-        const subject = subjectInput.value.trim();
-        const locale = localeInput.value.trim();
-        if (subject) {
-          vmButton.setAttribute("subject", subject);
-          vmEmbed.setAttribute("subject", subject);
-        } else {
-          vmButton.removeAttribute("subject");
-          vmEmbed.removeAttribute("subject");
-        }
-        if (locale) {
-          vmButton.setAttribute("locale", locale);
-          vmEmbed.setAttribute("locale", locale);
-        } else {
-          vmButton.removeAttribute("locale");
-          vmEmbed.removeAttribute("locale");
-        }
-      }
-      subjectInput.addEventListener("input", syncAttributes);
-      localeInput.addEventListener("input", syncAttributes);
-
-      // SDK 加载后监听事件（文档事件名）
-      // 参考: Getting started with Online Measurements — window.Volumental.on('volumental:on-measurement', handler)
-      function onSdkReady(fn) {
+      function onReady(fn) {
         if (window.Volumental) fn();
         else
           window.addEventListener("volumental:sdk-ready", fn, { once: true });
       }
 
-      onSdkReady(() => {
-        // 初始同步一次属性
-        syncAttributes();
-        sdkStatus.textContent = "SDK 已加载，可开始扫描。";
-        // 当用户成功完成扫描，会触发该事件，拿到 scanId
-        window.Volumental.on("volumental:on-measurement", (data) => {
-          // 兼容可能的结构差异
-          const scanId = data?.scanId || data?.scan?.id || data?.id || "";
-          const subject = subjectInput.value.trim();
-          const locale = localeInput.value.trim();
-          const userAgent = navigator.userAgent;
+      onReady(() => {
+        const statusEl = document.getElementById("sdkStatus");
+        if (statusEl) statusEl.textContent = "SDK loaded. You can scan now.";
 
+        window.Volumental.on("volumental:on-measurement", (data) => {
+          const scanId = data?.scanId || data?.scan?.id || data?.id || "";
           const payload = {
-            subject,
+            subject: "",
             scanId,
-            userAgent,
-            locale: locale || navigator.language || "",
+            userAgent: navigator.userAgent,
+            locale: navigator.language || "",
             extra: data || {},
           };
-
-          // 优先使用 sendBeacon（避免 CORS/预检），失败时降级 fetch(no-cors)
           try {
             const blob = new Blob([JSON.stringify(payload)], {
               type: "application/json",
             });
-            const sent = navigator.sendBeacon(LOG_ENDPOINT, blob);
-            if (!sent) {
-              // 降级（不能读响应，但能将数据送达）
-              fetch(LOG_ENDPOINT, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-              }).catch(() => {});
-            }
+            navigator.sendBeacon(LOG_ENDPOINT, blob);
           } catch (e) {
             fetch(LOG_ENDPOINT, {
               method: "POST",
@@ -182,22 +89,16 @@
         });
       });
 
-      // 如 SDK 尚未就绪，显示状态
+      // 3 秒仍未加载到 SDK，提示用户刷新
       setTimeout(() => {
         if (!window.Volumental) {
-          sdkStatus.textContent = "正在等待 SDK 加载… 若长时间无响应，请刷新页面。";
+          const statusEl = document.getElementById("sdkStatus");
+          if (statusEl)
+            statusEl.textContent = "SDK 未加载，请检查网络或稍后刷新。";
         }
-      }, 1500);
-
-      // 兜底按钮：直接触发 web component 的点击（若其隐藏也会打开）
-      fallbackStartBtn.addEventListener("click", () => {
-        try {
-          // 优先触发按钮组件
-          vmButton?.click();
-          // 同时确保属性同步
-          syncAttributes();
-        } catch (_) {}
-      });
+      }, 3000);
     </script>
+
+    <noscript>需要启用 JavaScript 才能进行扫描。</noscript>
   </body>
 </html>
