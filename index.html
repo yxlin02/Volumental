@@ -36,12 +36,7 @@
     </style>
   </head>
   <body>
-    <!-- 只保留 SDK 与内嵌扫描器，尽量接近官方 collector 页面 -->
-    <script
-      async
-      src="https://js.volumental.com/sdk/v1/volumental.js"
-      data-client-id="wb7ILNMFUGQXq9Lbo6TwkZk6yyFMXlzX"
-    ></script>
+    <!-- 只保留 SDK 与内嵌扫描器，尽量接近官方 collector 页面。改为动态注入以捕获 onerror/onload。 -->
 
     <div class="wrap">
       <div class="note" id="sdkStatus">Loading Volumental SDK…</div>
@@ -53,12 +48,30 @@
     <script>
       const LOG_ENDPOINT =
         "https://script.google.com/macros/s/AKfycbzNSJAJ6JAO2Cx8m3wzev0DYXWYcXrUyIVMdSbW6BOiB4LP46BW5Rsyut9qT_qn9zE0/exec";
+      const SDK_URL = "https://js.volumental.com/sdk/v1/volumental.js";
+      const CLIENT_ID = "wb7ILNMFUGQXq9Lbo6TwkZk6yyFMXlzX";
 
       function onReady(fn) {
         if (window.Volumental) fn();
-        else
-          window.addEventListener("volumental:sdk-ready", fn, { once: true });
+        else window.addEventListener("volumental:sdk-ready", fn, { once: true });
       }
+
+      // 动态插入 SDK，带错误处理
+      (function loadSdk() {
+        const s = document.createElement("script");
+        s.async = true;
+        s.src = SDK_URL;
+        s.setAttribute("data-client-id", CLIENT_ID);
+        s.onload = () => {
+          const statusEl = document.getElementById("sdkStatus");
+          if (statusEl) statusEl.textContent = "SDK script loaded, waiting for init…";
+        };
+        s.onerror = () => {
+          const statusEl = document.getElementById("sdkStatus");
+          if (statusEl) statusEl.textContent = "SDK 脚本加载失败（可能被网络或策略拦截）。";
+        };
+        document.body.appendChild(s);
+      })();
 
       onReady(() => {
         const statusEl = document.getElementById("sdkStatus");
@@ -89,12 +102,12 @@
         });
       });
 
-      // 3 秒仍未加载到 SDK，提示用户刷新
+      // 3 秒仍未加载到 SDK，提示用户刷新/或域名未授权
       setTimeout(() => {
         if (!window.Volumental) {
           const statusEl = document.getElementById("sdkStatus");
           if (statusEl)
-            statusEl.textContent = "SDK 未加载，请检查网络或稍后刷新。";
+            statusEl.textContent = "SDK 未完成初始化：可能 1) 网络阻断 2) 站点域名未在 Volumental 客户端允许列表 3) 浏览器限制。";
         }
       }, 3000);
     </script>
