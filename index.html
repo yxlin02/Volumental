@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <title>Foot Scan Test</title>
+    <style>
+      body {
+        font-family: -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial,
+          "Noto Sans", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+          sans-serif;
+        margin: 0;
+        padding: 2rem;
+      }
+      .container {
+        max-width: 640px;
+        margin: 0 auto;
+      }
+      .field {
+        margin: 1rem 0;
+      }
+      input,
+      button {
+        font-size: 16px;
+        padding: 0.8rem;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      volumental-measurement {
+        display: block;
+        margin-top: 1rem;
+      }
+      .note {
+        color: #666;
+        font-size: 14px;
+        margin-top: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Volumental SDK（文档要求）：把 client id 放到 data-client-id -->
+    <script
+      async
+      src="https://js.volumental.com/sdk/v1/volumental.js"
+      data-client-id="wb7ILNMFUGQXq9Lbo6TwkZk6yyFMXlzX"
+    ></script>
+
+    <div class="container">
+      <h2>Foot Scan Test</h2>
+
+      <div class="field">
+        <label>Subject（用户唯一标识）</label>
+        <input id="subjectInput" placeholder="如: phone/email/uuid" />
+      </div>
+
+      <div class="field">
+        <label>Locale（可选）</label>
+        <input id="localeInput" placeholder="如: en, en-GB, zh, fr ..." />
+        <div class="note">不填则使用浏览器语言；支持的语言见文档。</div>
+      </div>
+
+      <!-- Volumental 测量按钮组件（文档示例） -->
+      <volumental-measurement
+        id="vmButton"
+        variant="outline"
+        measurement-on-widget="true"
+      ></volumental-measurement>
+
+      <div class="note">
+        点击上方按钮开始扫描。完成后会自动将 scanId 与 subject 上报到表格。
+      </div>
+    </div>
+
+    <script>
+      // 你的 Apps Script Web App URL（/exec）
+      const LOG_ENDPOINT =
+        "https://script.google.com/macros/s/AKfycbzNSJAJ6JAO2Cx8m3wzev0DYXWYcXrUyIVMdSbW6BOiB4LP46BW5Rsyut9qT_qn9zE0/exec";
+
+      const subjectInput = document.getElementById("subjectInput");
+      const localeInput = document.getElementById("localeInput");
+      const vmButton = document.getElementById("vmButton");
+
+      // 根据输入动态设置组件属性
+      function syncAttributes() {
+        const subject = subjectInput.value.trim();
+        const locale = localeInput.value.trim();
+        if (subject) vmButton.setAttribute("subject", subject);
+        else vmButton.removeAttribute("subject");
+        if (locale) vmButton.setAttribute("locale", locale);
+        else vmButton.removeAttribute("locale");
+      }
+      subjectInput.addEventListener("input", syncAttributes);
+      localeInput.addEventListener("input", syncAttributes);
+
+      // SDK 加载后监听事件（文档事件名）
+      // 参考: Getting started with Online Measurements — window.Volumental.on('volumental:on-measurement', handler)
+      function onSdkReady(fn) {
+        if (window.Volumental) fn();
+        else
+          window.addEventListener("volumental:sdk-ready", fn, { once: true });
+      }
+
+      onSdkReady(() => {
+        // 当用户成功完成扫描，会触发该事件，拿到 scanId
+        window.Volumental.on("volumental:on-measurement", (data) => {
+          // 兼容可能的结构差异
+          const scanId = data?.scanId || data?.scan?.id || data?.id || "";
+          const subject = subjectInput.value.trim();
+          const locale = localeInput.value.trim();
+          const userAgent = navigator.userAgent;
+
+          const payload = {
+            subject,
+            scanId,
+            userAgent,
+            locale: locale || navigator.language || "",
+            extra: data || {},
+          };
+
+          // 优先使用 sendBeacon（避免 CORS/预检），失败时降级 fetch(no-cors)
+          try {
+            const blob = new Blob([JSON.stringify(payload)], {
+              type: "application/json",
+            });
+            const sent = navigator.sendBeacon(LOG_ENDPOINT, blob);
+            if (!sent) {
+              // 降级（不能读响应，但能将数据送达）
+              fetch(LOG_ENDPOINT, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              }).catch(() => {});
+            }
+          } catch (e) {
+            fetch(LOG_ENDPOINT, {
+              method: "POST",
+              mode: "no-cors",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            }).catch(() => {});
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
