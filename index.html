@@ -41,6 +41,7 @@
     <div class="wrap">
       <div class="note" id="sdkStatus">Loading Volumental SDK…</div>
       <div class="note" id="elementStatus"></div>
+      <div class="note" id="eventStatus" style="color: #0066cc; font-weight: bold;"></div>
       <volumental-measurement
         id="vmBtn"
         variant="outline"
@@ -96,6 +97,12 @@
           elStatus.textContent = `components: button=${hasBtn}, embedded=${hasEmbed}`;
 
         window.Volumental.on("volumental:on-measurement", (data) => {
+          console.log("volumental:on-measurement event triggered", data);
+          const eventStatusEl = document.getElementById("eventStatus");
+          if (eventStatusEl) {
+            eventStatusEl.textContent = "扫描完成！正在发送数据到表格...";
+          }
+
           const scanId = data?.scanId || data?.scan?.id || data?.id || "";
           const payload = {
             subject: "",
@@ -104,19 +111,48 @@
             locale: navigator.language || "",
             extra: data || {},
           };
-          try {
-            const blob = new Blob([JSON.stringify(payload)], {
-              type: "application/json",
+
+          console.log("Sending payload to Apps Script:", payload);
+
+          // 使用 fetch 并尝试读取响应（如果 CORS 允许）
+          fetch(LOG_ENDPOINT, {
+            method: "POST",
+            mode: "cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+            .then((res) => {
+              console.log("Response status:", res.status);
+              return res.json();
+            })
+            .then((result) => {
+              console.log("Response from Apps Script:", result);
+              if (eventStatusEl) {
+                eventStatusEl.textContent = `数据已发送！scanId: ${scanId}`;
+                eventStatusEl.style.color = "#00aa00";
+              }
+            })
+            .catch((err) => {
+              console.error("Error sending data:", err);
+              // 降级到 no-cors 模式（无法读取响应，但数据可能已送达）
+              fetch(LOG_ENDPOINT, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              }).then(() => {
+                if (eventStatusEl) {
+                  eventStatusEl.textContent = `数据已发送（no-cors模式）scanId: ${scanId}`;
+                  eventStatusEl.style.color = "#ff8800";
+                }
+              }).catch((e2) => {
+                console.error("Fallback also failed:", e2);
+                if (eventStatusEl) {
+                  eventStatusEl.textContent = "发送失败，请检查控制台";
+                  eventStatusEl.style.color = "#cc0000";
+                }
+              });
             });
-            navigator.sendBeacon(LOG_ENDPOINT, blob);
-          } catch (e) {
-            fetch(LOG_ENDPOINT, {
-              method: "POST",
-              mode: "no-cors",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            }).catch(() => {});
-          }
         });
       });
 
