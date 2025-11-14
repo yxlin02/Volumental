@@ -30,6 +30,7 @@
 
     <div class="wrap">
       <volumental-measurement
+        id="volumental-widget"
         variant="outline"
         measurement-on-widget="true"
       ></volumental-measurement>
@@ -41,12 +42,6 @@
       const SDK_URL = "https://js.volumental.com/sdk/v1/volumental.js";
       const CLIENT_ID = "f5b24fb9-1881-4998-a641-9f840056dcdd";
 
-      function onReady(fn) {
-        if (window.Volumental) fn();
-        else
-          window.addEventListener("volumental:sdk-ready", fn, { once: true });
-      }
-
       // 加载 SDK
       (function loadSdk() {
         const s = document.createElement("script");
@@ -56,18 +51,28 @@
         document.body.appendChild(s);
       })();
 
-      // 监听扫描完成事件
-      onReady(() => {
-        window.Volumental.on("volumental:on-measurement", (data) => {
-          const subject = data?.subject || "";
-          const scanId = data?.scanId || data?.scan?.id || data?.id || "";
+      // 等待 SDK 加载完成后设置事件监听
+      window.addEventListener("volumental:on-loaded", () => {
+        // 找到 widget 元素
+        const element = document.getElementById("volumental-widget");
+        if (!element) {
+          console.error("Could not find volumental-measurement element");
+          return;
+        }
+
+        // 根据文档，在元素上使用 addEventListener 监听事件
+        element.addEventListener("volumental:on-measurement", (e) => {
+          // 根据文档，数据在 e.detail 中，包含 { id } 字段
+          const scanId = e.detail?.id || "";
+          // 从 widget 元素获取 subject 属性（如果设置了）
+          const subject = element.getAttribute("subject") || "";
           
           const payload = {
             subject: subject,
-            scanId,
+            scanId: scanId,
             userAgent: navigator.userAgent,
             locale: navigator.language || "",
-            extra: data || {},
+            extra: e.detail || {},
           };
 
           // 发送数据到 Apps Script
