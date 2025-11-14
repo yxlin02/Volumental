@@ -52,8 +52,40 @@
         font-size: 14px;
         color: #666;
       }
+      .email-form .error-message {
+        margin-top: 8px;
+        font-size: 14px;
+        color: #d32f2f;
+        display: none;
+      }
+      .email-form .error-message.show {
+        display: block;
+      }
       .scan-button-container {
         text-align: center;
+        position: relative;
+      }
+      .scan-button-container.disabled {
+        opacity: 0.5;
+        pointer-events: none;
+      }
+      .scan-button-container .disabled-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.7);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        font-size: 14px;
+        color: #666;
+        z-index: 10;
+      }
+      .scan-button-container.disabled .disabled-overlay {
+        display: flex;
       }
       /* 调试信息显示区域 */
       #debug-panel {
@@ -166,9 +198,15 @@
         <div class="note">
           Please enter your email to start the measurement.
         </div>
+        <div class="error-message" id="emailError">
+          Please enter a valid email address to start scanning.
+        </div>
       </div>
 
-      <div class="scan-button-container">
+      <div class="scan-button-container" id="scanButtonContainer">
+        <div class="disabled-overlay">
+          Please enter your email address first
+        </div>
         <volumental-measurement
           id="volumental-widget"
           variant="outline"
@@ -447,9 +485,82 @@
 
         console.log("[Volumental] ✅ 找到 widget 元素，开始设置事件监听器");
 
-        // 监听 widget 打开事件
-        element.addEventListener("volumental:on-opened", () => {
+        // Email 验证函数
+        function isValidEmail(email) {
+          if (!email || typeof email !== "string") return false;
+          const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          return emailPattern.test(email.trim());
+        }
+
+        // 更新扫描按钮状态
+        function updateScanButtonState() {
+          const emailInput = document.getElementById("emailInput");
+          const scanButtonContainer = document.getElementById("scanButtonContainer");
+          const emailError = document.getElementById("emailError");
+          
+          if (!emailInput || !scanButtonContainer) return;
+          
+          const email = emailInput.value ? emailInput.value.trim() : "";
+          const isValid = isValidEmail(email);
+          
+          if (isValid) {
+            scanButtonContainer.classList.remove("disabled");
+            emailError.classList.remove("show");
+            console.log("[Volumental] ✅ Email 有效，扫描按钮已启用");
+          } else {
+            scanButtonContainer.classList.add("disabled");
+            if (email.length > 0) {
+              emailError.classList.add("show");
+            } else {
+              emailError.classList.remove("show");
+            }
+            console.log("[Volumental] ⚠️ Email 无效或为空，扫描按钮已禁用");
+          }
+        }
+
+        // 监听 email 输入框变化
+        const emailInput = document.getElementById("emailInput");
+        if (emailInput) {
+          emailInput.addEventListener("input", updateScanButtonState);
+          emailInput.addEventListener("blur", updateScanButtonState);
+          emailInput.addEventListener("change", updateScanButtonState);
+        }
+
+        // 初始化按钮状态
+        updateScanButtonState();
+
+        // 监听 widget 打开事件 - 在打开时验证 email
+        element.addEventListener("volumental:on-opened", (e) => {
           console.log("[Volumental] 📱 扫描界面已打开");
+          
+          // 再次验证 email
+          const emailInput = document.getElementById("emailInput");
+          const email = emailInput ? emailInput.value.trim() : "";
+          
+          if (!isValidEmail(email)) {
+            console.warn("[Volumental] ⚠️ Email 无效，阻止扫描");
+            addDebugLog("Email is required. Please enter your email address first.", "error");
+            
+            // 显示错误提示
+            const emailError = document.getElementById("emailError");
+            if (emailError) {
+              emailError.classList.add("show");
+              emailError.textContent = "Please enter a valid email address to start scanning.";
+            }
+            
+            // 滚动到 email 输入框
+            if (emailInput) {
+              emailInput.scrollIntoView({ behavior: "smooth", block: "center" });
+              emailInput.focus();
+            }
+            
+            // 提示用户（使用更友好的方式）
+            setTimeout(() => {
+              // 尝试关闭扫描界面（如果 widget 支持）
+              // 注意：这取决于 Volumental widget 的实现
+              console.warn("[Volumental] ⚠️ 由于 email 无效，请先填写 email 地址");
+            }, 100);
+          }
         });
 
         // 监听 widget 关闭事件
@@ -486,9 +597,33 @@
             return;
           }
 
-          // 强制从输入框获取最新的 email 值（确保获取到用户最新输入的值）
+          // 在发送前再次验证 email
           const emailInput = document.getElementById("emailInput");
-          let email = "";
+          let email = emailInput ? emailInput.value.trim() : "";
+          
+          if (!isValidEmail(email)) {
+            console.error("[Volumental] ❌ Email 无效，无法发送数据");
+            addDebugLog("Cannot send data: Email is required and must be valid.", "error");
+            
+            // 显示错误提示
+            const emailError = document.getElementById("emailError");
+            if (emailError) {
+              emailError.classList.add("show");
+              emailError.textContent = "Please enter a valid email address. Data was not sent.";
+            }
+            
+            // 滚动到 email 输入框
+            if (emailInput) {
+              emailInput.scrollIntoView({ behavior: "smooth", block: "center" });
+              emailInput.focus();
+            }
+            
+            return; // 不发送数据
+          }
+
+          // 强制从输入框获取最新的 email 值（确保获取到用户最新输入的值）
+          // email 变量已在上面声明，这里重新获取确保是最新值
+          email = emailInput ? emailInput.value.trim() : "";
 
           // 优先从输入框获取（实时值）- 使用多种方式确保获取到值
           if (emailInput) {
