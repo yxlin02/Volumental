@@ -48,6 +48,38 @@
       const sentScanIds = new Set();
       let isListenerSetup = false;
 
+      // 获取 subject 的辅助函数（从多个来源获取）
+      function getSubject() {
+        // 1. 从 URL 参数获取（优先级最高）
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlSubject = urlParams.get("subject");
+        if (urlSubject) {
+          console.log("[Volumental] 从 URL 参数获取 subject:", urlSubject);
+          return urlSubject;
+        }
+
+        // 2. 从 widget 元素的 subject 属性获取
+        const element = document.getElementById("volumental-widget");
+        if (element) {
+          const attrSubject = element.getAttribute("subject");
+          if (attrSubject) {
+            console.log("[Volumental] 从 widget 属性获取 subject:", attrSubject);
+            return attrSubject;
+          }
+        }
+
+        // 3. 从 localStorage 获取
+        const storedSubject = localStorage.getItem("volumental_subject");
+        if (storedSubject) {
+          console.log("[Volumental] 从 localStorage 获取 subject:", storedSubject);
+          return storedSubject;
+        }
+
+        // 4. 如果都没有，返回空字符串
+        console.log("[Volumental] 未找到 subject，将使用空值");
+        return "";
+      }
+
       // 加载 SDK
       (function loadSdk() {
         const s = document.createElement("script");
@@ -80,6 +112,13 @@
           return;
         }
 
+        // 获取 subject 并设置到 widget 元素上
+        const subject = getSubject();
+        if (subject) {
+          element.setAttribute("subject", subject);
+          console.log("[Volumental] ✅ 已设置 subject 到 widget:", subject);
+        }
+
         console.log("[Volumental] ✅ 找到 widget 元素，开始设置事件监听器");
 
         // 监听 widget 打开事件
@@ -106,13 +145,13 @@
 
           // 根据文档，数据在 e.detail 中，包含 { id } 字段
           const scanId = e.detail?.id || "";
-          
+
           // 防重复提交：如果这个 scanId 已经发送过，跳过
           if (!scanId) {
             console.warn("[Volumental] ⚠️ scanId 为空，跳过发送");
             return;
           }
-          
+
           if (sentScanIds.has(scanId)) {
             console.warn(
               "[Volumental] ⚠️ scanId 已发送过，跳过重复提交:",
@@ -121,8 +160,8 @@
             return;
           }
 
-          // 从 widget 元素获取 subject 属性（如果设置了）
-          const subject = element.getAttribute("subject") || "";
+          // 获取 subject（从多个来源）
+          const subject = getSubject();
 
           console.log("[Volumental] 提取的数据:", { scanId, subject });
 
