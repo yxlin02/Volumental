@@ -97,44 +97,6 @@
       const sentScanIds = new Set();
       let isListenerSetup = false;
 
-      // 获取 subject 的辅助函数（从多个来源获取）
-      function getSubject() {
-        // 1. 从 URL 参数获取（优先级最高）
-        const urlParams = new URLSearchParams(window.location.search);
-        const urlSubject = urlParams.get("subject");
-        if (urlSubject) {
-          console.log("[Volumental] 从 URL 参数获取 subject:", urlSubject);
-          return urlSubject;
-        }
-
-        // 2. 从 widget 元素的 subject 属性获取
-        const element = document.getElementById("volumental-widget");
-        if (element) {
-          const attrSubject = element.getAttribute("subject");
-          if (attrSubject) {
-            console.log(
-              "[Volumental] 从 widget 属性获取 subject:",
-              attrSubject
-            );
-            return attrSubject;
-          }
-        }
-
-        // 3. 从 localStorage 获取
-        const storedSubject = localStorage.getItem("volumental_subject");
-        if (storedSubject) {
-          console.log(
-            "[Volumental] 从 localStorage 获取 subject:",
-            storedSubject
-          );
-          return storedSubject;
-        }
-
-        // 4. 如果都没有，返回空字符串
-        console.log("[Volumental] 未找到 subject，将使用空值");
-        return "";
-      }
-
       // 获取 email 的辅助函数（从多个来源获取）
       function getEmail() {
         // 1. 从 email 输入框获取（优先级最高）
@@ -153,21 +115,14 @@
           return urlEmail;
         }
 
-        // 3. 如果 URL 中有 subject 且看起来像 email，使用它
-        const urlSubject = urlParams.get("subject");
-        if (urlSubject && urlSubject.includes("@")) {
-          console.log("[Volumental] 从 subject 参数识别为 email:", urlSubject);
-          return urlSubject;
-        }
-
-        // 4. 从 localStorage 获取
+        // 3. 从 localStorage 获取
         const storedEmail = localStorage.getItem("volumental_email");
         if (storedEmail) {
           console.log("[Volumental] 从 localStorage 获取 email:", storedEmail);
           return storedEmail;
         }
 
-        // 5. 如果都没有，返回空字符串
+        // 4. 如果都没有，返回空字符串
         console.log("[Volumental] 未找到 email，将使用空值");
         return "";
       }
@@ -204,33 +159,8 @@
           return;
         }
 
-        // 获取 email 和 subject，并设置到 widget 元素上
+        // 获取 email（不再设置 subject，根据文档默认是 undefined）
         const email = getEmail();
-        const subject = getSubject() || email; // 如果没有 subject，使用 email
-
-        if (subject) {
-          element.setAttribute("subject", subject);
-          console.log("[Volumental] ✅ 已设置 subject 到 widget:", subject);
-        }
-
-        // 监听 email 输入框变化，自动更新 widget 的 subject
-        const emailInput = document.getElementById("emailInput");
-        if (emailInput) {
-          function updateSubjectFromEmail() {
-            const emailValue = emailInput.value.trim();
-            if (emailValue) {
-              element.setAttribute("subject", emailValue);
-              console.log(
-                "[Volumental] 📧 Email 输入变化，已更新 subject:",
-                emailValue
-              );
-            } else {
-              element.removeAttribute("subject");
-            }
-          }
-          emailInput.addEventListener("input", updateSubjectFromEmail);
-          emailInput.addEventListener("blur", updateSubjectFromEmail);
-        }
 
         console.log("[Volumental] ✅ 找到 widget 元素，开始设置事件监听器");
 
@@ -273,15 +203,13 @@
             return;
           }
 
-          // 获取 subject 和 email（从多个来源）
-          const subject = getSubject();
+          // 获取 email
           const email = getEmail();
 
-          console.log("[Volumental] 提取的数据:", { scanId, subject, email });
+          console.log("[Volumental] 提取的数据:", { scanId, email });
 
           const payload = {
-            subject: subject,
-            email: email, // 添加 email 字段
+            email: email,
             scanId: scanId,
             userAgent: navigator.userAgent,
             locale: navigator.language || "",
