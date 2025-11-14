@@ -203,21 +203,65 @@
             return;
           }
 
-          // 获取 email
-          const email = getEmail();
+          // 强制从输入框获取最新的 email 值（确保获取到用户最新输入的值）
+          const emailInput = document.getElementById("emailInput");
+          let email = "";
+          
+          // 优先从输入框获取（实时值）
+          if (emailInput && emailInput.value) {
+            email = emailInput.value.trim();
+            console.log("[Volumental] 从输入框获取 email（实时值）:", email);
+          } else {
+            // 如果输入框为空，尝试从其他来源获取
+            email = getEmail();
+            console.log("[Volumental] 从其他来源获取 email:", email);
+          }
+
+          // 验证 email 是否有效
+          if (!email) {
+            console.warn("[Volumental] ⚠️ Email 为空！请确保已填写 email 地址");
+            // 即使 email 为空，也继续发送数据（让后端处理）
+          } else {
+            // 简单的 email 格式验证
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailPattern.test(email)) {
+              console.warn("[Volumental] ⚠️ Email 格式可能不正确:", email);
+            }
+          }
 
           console.log("[Volumental] 提取的数据:", { scanId, email });
 
           const payload = {
-            email: email,
+            email: email || "", // 确保 email 字段存在，即使为空
             scanId: scanId,
             userAgent: navigator.userAgent,
             locale: navigator.language || "",
             extra: e.detail || {},
           };
 
-          console.log("[Volumental] 📤 准备发送数据到 Apps Script:", payload);
+          console.log("[Volumental] 📤 准备发送数据到 Apps Script");
+          console.log("[Volumental] 完整 payload:", JSON.stringify(payload, null, 2));
+          console.log("[Volumental] Email 字段值:", payload.email);
+          console.log("[Volumental] Email 字段类型:", typeof payload.email);
+          console.log("[Volumental] Email 字段长度:", payload.email ? payload.email.length : 0);
+          console.log("[Volumental] Email 是否为空:", !payload.email || payload.email === "");
           console.log("[Volumental] 目标 URL:", LOG_ENDPOINT);
+
+          // 验证 payload 中的 email 字段
+          const payloadString = JSON.stringify(payload);
+          console.log("[Volumental] 序列化后的 JSON 字符串:", payloadString);
+          console.log("[Volumental] JSON 中是否包含 email 字段:", payloadString.includes('"email"'));
+          
+          // 再次验证 email 输入框的值（发送前最后一次检查）
+          const finalEmailCheck = emailInput ? emailInput.value.trim() : "";
+          if (finalEmailCheck && finalEmailCheck !== payload.email) {
+            console.warn("[Volumental] ⚠️ 警告：输入框的 email 值与 payload 中的不一致！");
+            console.warn("[Volumental] 输入框值:", finalEmailCheck);
+            console.warn("[Volumental] Payload 值:", payload.email);
+            // 更新 payload 中的 email
+            payload.email = finalEmailCheck;
+            console.log("[Volumental] 已更新 payload 中的 email 为输入框的最新值");
+          }
 
           // 标记为已发送（在发送前标记，防止并发请求）
           sentScanIds.add(scanId);
