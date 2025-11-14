@@ -589,10 +589,7 @@
               "[Volumental] ⚠️ scanId 已发送过（可能是缓存的旧 scanId），跳过:",
               scanId
             );
-            addDebugLog(
-              `Ignoring already sent scanId ${scanId}`,
-              "warn"
-            );
+            addDebugLog(`Ignoring already sent scanId ${scanId}`, "warn");
             return;
           }
 
@@ -609,7 +606,9 @@
               scanId
             );
             addDebugLog(
-              `Ignoring cached scanId ${scanId} (triggered ${now - widgetOpenedTimestamp}ms after widget opened)`,
+              `Ignoring cached scanId ${scanId} (triggered ${
+                now - widgetOpenedTimestamp
+              }ms after widget opened)`,
               "warn"
             );
             return;
