@@ -61,8 +61,8 @@
     <!-- Volumental Measurement Widget -->
 
     <div class="wrap">
-      <h2 style="margin-top: 0; text-align: center;">Foot Measurement</h2>
-      
+      <h2 style="margin-top: 0; text-align: center">Foot Measurement</h2>
+
       <div class="email-form">
         <label for="emailInput">Email Address *</label>
         <input
@@ -71,9 +71,11 @@
           placeholder="your.email@example.com"
           required
         />
-        <div class="note">Please enter your email to start the measurement.</div>
+        <div class="note">
+          Please enter your email to start the measurement.
+        </div>
       </div>
-      
+
       <div class="scan-button-container">
         <volumental-measurement
           id="volumental-widget"
@@ -205,7 +207,7 @@
         // 获取 email 和 subject，并设置到 widget 元素上
         const email = getEmail();
         const subject = getSubject() || email; // 如果没有 subject，使用 email
-        
+
         if (subject) {
           element.setAttribute("subject", subject);
           console.log("[Volumental] ✅ 已设置 subject 到 widget:", subject);
@@ -218,7 +220,10 @@
             const emailValue = emailInput.value.trim();
             if (emailValue) {
               element.setAttribute("subject", emailValue);
-              console.log("[Volumental] 📧 Email 输入变化，已更新 subject:", emailValue);
+              console.log(
+                "[Volumental] 📧 Email 输入变化，已更新 subject:",
+                emailValue
+              );
             } else {
               element.removeAttribute("subject");
             }
