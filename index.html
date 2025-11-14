@@ -741,31 +741,21 @@
           // 注意：后端会进行最终检查（检查数据库中是否已存在 scanId）
           // 如果后端返回 skipped: true，说明 scanId 已存在于数据库中
 
-          // 在发送前再次验证 email（优先使用已确认的 email）
-          // 如果 confirmedEmail 为空，尝试从输入框直接获取（包括 autofill 的值）
-          let email = confirmedEmail;
-          
-          if (!email) {
-            // 尝试从输入框直接获取（确保能获取到 autofill 的值）
-            const emailInput = document.getElementById("emailInput");
-            if (emailInput && emailInput.value && emailInput.value.trim()) {
-              email = emailInput.value.trim();
-              console.log("[Volumental] 从输入框直接获取 email（包括 autofill）:", email);
-            } else {
-              // 如果输入框也没有，使用 getEmail() 函数
-              email = getEmail();
-            }
-          }
-          
-          // 记录最终使用的 email
-          console.log("[Volumental] 📧 最终使用的 email:", email);
-          console.log("[Volumental] 📧 confirmedEmail:", confirmedEmail);
-          console.log("[Volumental] 📧 输入框值:", document.getElementById("emailInput")?.value);
+          // 只使用已确认的 email（必须点击 confirm 按钮）
+          const email = confirmedEmail;
 
-          if (!isValidEmail(email)) {
-            console.error("[Volumental] ❌ Email 无效，无法发送数据");
+          // 记录 email 状态
+          console.log("[Volumental] 📧 confirmedEmail:", confirmedEmail);
+          console.log(
+            "[Volumental] 📧 输入框值:",
+            document.getElementById("emailInput")?.value
+          );
+
+          // 检查 email 是否已确认
+          if (!email || !isValidEmail(email)) {
+            console.error("[Volumental] ❌ Email 未确认或无效，无法发送数据");
             addDebugLog(
-              "Cannot send data: Email is required and must be valid.",
+              "Cannot send data: Please confirm your email address first.",
               "error"
             );
 
@@ -774,10 +764,11 @@
             if (emailError) {
               emailError.classList.add("show");
               emailError.textContent =
-                "Please enter a valid email address. Data was not sent.";
+                "Please confirm your email address before scanning. Data was not sent.";
             }
 
             // 滚动到 email 输入框
+            const emailInput = document.getElementById("emailInput");
             if (emailInput) {
               emailInput.scrollIntoView({
                 behavior: "smooth",
@@ -789,22 +780,13 @@
             // 重置扫描状态，允许用户重新扫描
             isScanInProgress = false;
             currentScanSessionId = null;
-            console.log("[Volumental] 🔄 Email 无效，重置扫描状态");
+            console.log("[Volumental] 🔄 Email 未确认，重置扫描状态");
 
             return; // 不发送数据
           }
 
-          // email 已经通过 confirmedEmail || getEmail() 获取，无需再次获取
-          console.log("[Volumental] 使用的 email:", email);
-
+          console.log("[Volumental] 📧 最终使用的 email:", email);
           console.log("[Volumental] 提取的数据:", { scanId, email });
-
-          // 确保 email 不为空且有效
-          if (!email || !isValidEmail(email)) {
-            console.error("[Volumental] ❌ Email 无效或为空，无法发送");
-            addDebugLog(`Cannot send: Email is invalid or empty: "${email}"`, "error");
-            return;
-          }
 
           const payload = {
             email: email, // 确保 email 字段存在且有效
@@ -838,13 +820,18 @@
             "[Volumental] JSON 中是否包含 email 字段:",
             payloadString.includes('"email"')
           );
-          
+
           // 验证 email 在 JSON 中的位置
           const emailIndex = payloadString.indexOf('"email"');
           if (emailIndex !== -1) {
-            const emailValueStart = payloadString.indexOf(':', emailIndex) + 1;
-            const emailValueEnd = payloadString.indexOf(',', emailValueStart);
-            const emailInJson = payloadString.substring(emailValueStart, emailValueEnd !== -1 ? emailValueEnd : payloadString.indexOf('}', emailValueStart));
+            const emailValueStart = payloadString.indexOf(":", emailIndex) + 1;
+            const emailValueEnd = payloadString.indexOf(",", emailValueStart);
+            const emailInJson = payloadString.substring(
+              emailValueStart,
+              emailValueEnd !== -1
+                ? emailValueEnd
+                : payloadString.indexOf("}", emailValueStart)
+            );
             console.log("[Volumental] JSON 中的 email 值:", emailInJson.trim());
           }
 
