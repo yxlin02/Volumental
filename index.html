@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Volumental Collector (Minimal)</title>
+    <title>Foot Measurement</title>
     <style>
       html,
       body {
@@ -17,69 +17,22 @@
         background: #fff;
       }
       .wrap {
-        max-width: 720px;
-        margin: 0 auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
         padding: 16px;
-      }
-      volumental-measurement-embedded {
-        display: block;
-        min-height: 560px; /* 占位，确保可见 */
-        width: 100%;
-        border: 1px solid #eee;
-        border-radius: 8px;
-      }
-      .note {
-        color: #666;
-        font-size: 14px;
-        margin: 8px 0;
-      }
-      .debug-box {
-        background: #f5f5f5;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 12px;
-        margin: 12px 0;
-        font-size: 12px;
-        max-height: 300px;
-        overflow-y: auto;
-        word-break: break-all;
-      }
-      .debug-box h4 {
-        margin: 0 0 8px 0;
-        font-size: 14px;
-        color: #333;
-      }
-      .debug-item {
-        margin: 4px 0;
-        padding: 4px;
-        background: #fff;
-        border-left: 3px solid #0066cc;
       }
     </style>
   </head>
   <body>
-    <!-- 只保留 SDK 与内嵌扫描器，尽量接近官方 collector 页面。改为动态注入以捕获 onerror/onload。 -->
+    <!-- Volumental Measurement Widget -->
 
     <div class="wrap">
-      <h2 style="margin-top: 0;">Foot Measurement</h2>
-      
-      <div class="note" id="sdkStatus">Loading Volumental SDK…</div>
-      <div class="note" id="elementStatus"></div>
-      <div class="note" id="eventStatus" style="color: #0066cc; font-weight: bold;"></div>
-      
-      <div class="debug-box" id="debugBox" style="display: none;">
-        <h4>调试信息（手机端可见）</h4>
-        <div id="debugContent"></div>
-      </div>
-      
       <volumental-measurement
-        id="vmBtn"
         variant="outline"
         measurement-on-widget="true"
       ></volumental-measurement>
-      <volumental-measurement-embedded
-        id="vm"
-      ></volumental-measurement-embedded>
     </div>
 
     <script>
@@ -88,77 +41,24 @@
       const SDK_URL = "https://js.volumental.com/sdk/v1/volumental.js";
       const CLIENT_ID = "f5b24fb9-1881-4998-a641-9f840056dcdd";
 
-      // 调试信息显示函数（手机端可见）
-      function addDebugInfo(message, data = null) {
-        const debugBox = document.getElementById("debugBox");
-        const debugContent = document.getElementById("debugContent");
-        if (!debugBox || !debugContent) return;
-
-        debugBox.style.display = "block";
-        const time = new Date().toLocaleTimeString();
-        const item = document.createElement("div");
-        item.className = "debug-item";
-        item.innerHTML = `<strong>[${time}]</strong> ${message}`;
-        if (data) {
-          const dataStr = typeof data === "object" ? JSON.stringify(data, null, 2) : String(data);
-          item.innerHTML += `<pre style="margin: 4px 0; font-size: 11px; white-space: pre-wrap;">${dataStr}</pre>`;
-        }
-        debugContent.appendChild(item);
-        // 自动滚动到底部
-        debugBox.scrollTop = debugBox.scrollHeight;
-      }
-
       function onReady(fn) {
         if (window.Volumental) fn();
         else
           window.addEventListener("volumental:sdk-ready", fn, { once: true });
       }
 
-      // 动态插入 SDK，带错误处理
+      // 加载 SDK
       (function loadSdk() {
         const s = document.createElement("script");
         s.async = true;
         s.src = SDK_URL;
         s.setAttribute("data-client-id", CLIENT_ID);
-        s.onload = () => {
-          addDebugInfo("📥 SDK 脚本文件加载成功，等待初始化...");
-          const statusEl = document.getElementById("sdkStatus");
-          if (statusEl)
-            statusEl.textContent = "SDK script loaded, waiting for init…";
-        };
-        s.onerror = () => {
-          addDebugInfo("❌ SDK 脚本加载失败（可能被网络或策略拦截）");
-          const statusEl = document.getElementById("sdkStatus");
-          if (statusEl)
-            statusEl.textContent = "SDK 脚本加载失败（可能被网络或策略拦截）。";
-        };
         document.body.appendChild(s);
       })();
 
+      // 监听扫描完成事件
       onReady(() => {
-        addDebugInfo("✅ SDK 初始化完成");
-        const statusEl = document.getElementById("sdkStatus");
-        if (statusEl) statusEl.textContent = "SDK loaded. You can scan now.";
-
-        // 显示组件注册状态
-        const elStatus = document.getElementById("elementStatus");
-        const hasBtn = !!customElements.get("volumental-measurement");
-        const hasEmbed = !!customElements.get(
-          "volumental-measurement-embedded"
-        );
-        if (elStatus)
-          elStatus.textContent = `components: button=${hasBtn}, embedded=${hasEmbed}`;
-        addDebugInfo("组件注册状态", { button: hasBtn, embedded: hasEmbed });
-
         window.Volumental.on("volumental:on-measurement", (data) => {
-          addDebugInfo("✅ 扫描完成！事件已触发", data);
-          
-          const eventStatusEl = document.getElementById("eventStatus");
-          if (eventStatusEl) {
-            eventStatusEl.textContent = "扫描完成！正在发送数据到表格...";
-          }
-
-          // 从 Volumental 数据中获取 subject 和 scanId
           const subject = data?.subject || "";
           const scanId = data?.scanId || data?.scan?.id || data?.id || "";
           
@@ -170,60 +70,25 @@
             extra: data || {},
           };
 
-          addDebugInfo("📤 准备发送数据到 Apps Script", payload);
-
-          // 使用 fetch 并尝试读取响应（如果 CORS 允许）
+          // 发送数据到 Apps Script
           fetch(LOG_ENDPOINT, {
             method: "POST",
             mode: "cors",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           })
-            .then((res) => {
-              addDebugInfo(`📥 收到响应，状态码: ${res.status}`);
-              return res.json();
-            })
-            .then((result) => {
-              addDebugInfo("✅ 数据发送成功！Apps Script 响应", result);
-              if (eventStatusEl) {
-                eventStatusEl.textContent = `✅ 数据已发送！scanId: ${scanId}`;
-                eventStatusEl.style.color = "#00aa00";
-              }
-            })
-            .catch((err) => {
-              addDebugInfo("⚠️ CORS 模式失败，尝试 no-cors 模式", err.message || String(err));
-              // 降级到 no-cors 模式（无法读取响应，但数据可能已送达）
+            .then((res) => res.json())
+            .catch(() => {
+              // 降级到 no-cors 模式
               fetch(LOG_ENDPOINT, {
                 method: "POST",
                 mode: "no-cors",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
-              }).then(() => {
-                addDebugInfo("⚠️ 使用 no-cors 模式发送（无法确认是否成功）", { scanId });
-                if (eventStatusEl) {
-                  eventStatusEl.textContent = `⚠️ 数据已发送（no-cors模式）scanId: ${scanId}`;
-                  eventStatusEl.style.color = "#ff8800";
-                }
-              }).catch((e2) => {
-                addDebugInfo("❌ 发送失败", e2.message || String(e2));
-                if (eventStatusEl) {
-                  eventStatusEl.textContent = "❌ 发送失败，请查看下方调试信息";
-                  eventStatusEl.style.color = "#cc0000";
-                }
               });
             });
         });
       });
-
-      // 3 秒仍未加载到 SDK，提示用户刷新/或域名未授权
-      setTimeout(() => {
-        if (!window.Volumental) {
-          const statusEl = document.getElementById("sdkStatus");
-          if (statusEl)
-            statusEl.textContent =
-              "SDK 未完成初始化：可能 1) 网络阻断 2) 站点域名未在 Volumental 客户端允许列表 3) 浏览器限制。";
-        }
-      }, 3000);
     </script>
 
     <noscript>需要启用 JavaScript 才能进行扫描。</noscript>
