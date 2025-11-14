@@ -467,8 +467,6 @@
 
       console.log("[Volumental] 开始加载 SDK...", { SDK_URL, CLIENT_ID });
 
-      // 防重复提交：记录已发送的 scanId
-      const sentScanIds = new Set();
       let isListenerSetup = false;
       // 跟踪当前扫描会话：记录扫描开始时的 scanId，确保只上传本次扫描的 scanId
       let currentScanSessionId = null;
@@ -686,17 +684,8 @@
             return;
           }
 
-          // 前端检查 1：如果这个 scanId 已经发送过（同一页面会话中），直接忽略
-          if (sentScanIds.has(scanId)) {
-            console.warn(
-              "[Volumental] ⚠️ scanId 已在本页面会话中发送过，跳过:",
-              scanId
-            );
-            addDebugLog(`Ignoring already sent scanId ${scanId}`, "warn");
-            return;
-          }
-
-          // 前端检查 2：检查是否是缓存的旧 scanId（在 widget 打开后的短时间内触发）
+          // 前端检查：检查是否是缓存的旧 scanId（在 widget 打开后的短时间内触发）
+          // 注意：scanId 重复检查由后端完成
           const now = Date.now();
           if (
             widgetOpenedTimestamp &&
@@ -843,10 +832,7 @@
             !payload.email || payload.email === ""
           );
 
-          // 标记为已发送（在发送前标记，防止并发请求）
-          sentScanIds.add(scanId);
-
-          // 发送数据到 Apps Script
+          // 发送数据到 Apps Script（scanId 重复检查由后端完成）
           fetch(LOG_ENDPOINT, {
             method: "POST",
             mode: "cors",
@@ -873,7 +859,6 @@
                   `Backend detected duplicate scanId ${scanId}, skipped`,
                   "warn"
                 );
-                // 即使后端跳过，也保持 sentScanIds 标记，防止重复提交
               } else {
                 // 发送成功，标记扫描完成
                 console.log("[Volumental] ✅ 扫描会话完成");
@@ -925,14 +910,10 @@
                     `no-cors mode also failed: ${e2.message || e2}`,
                     "error"
                   );
-                  // 发送完全失败，移除标记，允许重试
-                  sentScanIds.delete(scanId);
+                  // 发送完全失败，重置扫描状态
                   isScanInProgress = false;
                   currentScanSessionId = null;
-                  console.log(
-                    "[Volumental] 已移除 scanId 标记，允许重试:",
-                    scanId
-                  );
+                  console.log("[Volumental] 发送失败，重置扫描状态");
                 });
             });
         });
