@@ -865,22 +865,45 @@
                 "[Volumental] ⚠️ CORS 模式失败，尝试 no-cors 模式:",
                 err
               );
+              addDebugLog(
+                `CORS failed, trying no-cors mode: ${err.message || err}`,
+                "warn"
+              );
+              
               // 降级到 no-cors 模式
+              // 注意：no-cors 模式下无法读取响应，但请求应该能发送
               fetch(LOG_ENDPOINT, {
                 method: "POST",
                 mode: "no-cors",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
               })
-                .then(() => {
+                .then((noCorsRes) => {
                   console.log(
                     "[Volumental] ⚠️ 使用 no-cors 模式发送（无法确认是否成功，但数据可能已送达）"
                   );
+                  addDebugLog(
+                    "Data sent via no-cors mode (cannot verify success)",
+                    "warn"
+                  );
                   // no-cors 模式下无法确认，但通常数据已送达，标记扫描完成
                   isScanInProgress = false;
+                  
+                  // 提示用户检查后端
+                  console.warn(
+                    "[Volumental] ⚠️ 注意：由于 CORS 限制，无法确认数据是否成功保存。请检查 Google Sheet 确认数据是否已记录。"
+                  );
+                  addDebugLog(
+                    "⚠️ Cannot verify if data was saved. Please check Google Sheet.",
+                    "warn"
+                  );
                 })
                 .catch((e2) => {
-                  console.error("[Volumental] ❌ 发送失败:", e2);
+                  console.error("[Volumental] ❌ no-cors 模式也失败:", e2);
+                  addDebugLog(
+                    `no-cors mode also failed: ${e2.message || e2}`,
+                    "error"
+                  );
                   // 发送完全失败，移除标记，允许重试
                   sentScanIds.delete(scanId);
                   isScanInProgress = false;
