@@ -55,6 +55,94 @@
       .scan-button-container {
         text-align: center;
       }
+      /* 调试信息显示区域 */
+      #debug-panel {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-height: 40vh;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        padding: 12px;
+        overflow-y: auto;
+        z-index: 10000;
+        border-top: 2px solid #007acc;
+        display: none; /* 默认隐藏，可以通过按钮切换 */
+      }
+      #debug-panel.show {
+        display: block;
+      }
+      #debug-panel .debug-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #444;
+      }
+      #debug-panel .debug-title {
+        font-weight: bold;
+        color: #4ec9b0;
+        font-size: 14px;
+      }
+      #debug-panel .debug-controls {
+        display: flex;
+        gap: 8px;
+      }
+      #debug-panel button {
+        background: #007acc;
+        color: white;
+        border: none;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      #debug-panel button:hover {
+        background: #005a9e;
+      }
+      #debug-panel .debug-content {
+        max-height: calc(40vh - 60px);
+        overflow-y: auto;
+      }
+      #debug-panel .debug-log {
+        margin: 4px 0;
+        padding: 4px 8px;
+        border-left: 3px solid transparent;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+      }
+      #debug-panel .debug-log.log {
+        border-left-color: #4ec9b0;
+      }
+      #debug-panel .debug-log.warn {
+        border-left-color: #dcdcaa;
+        background: rgba(220, 220, 170, 0.1);
+      }
+      #debug-panel .debug-log.error {
+        border-left-color: #f48771;
+        background: rgba(244, 135, 113, 0.1);
+      }
+      #debug-toggle {
+        position: fixed;
+        bottom: 10px;
+        right: 10px;
+        background: #007acc;
+        color: white;
+        border: none;
+        padding: 10px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        cursor: pointer;
+        z-index: 10001;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      }
+      #debug-toggle:hover {
+        background: #005a9e;
+      }
     </style>
   </head>
   <body>
@@ -85,7 +173,108 @@
       </div>
     </div>
 
+    <!-- 调试信息显示区域 -->
+    <button id="debug-toggle">🔍 Debug</button>
+    <div id="debug-panel">
+      <div class="debug-header">
+        <div class="debug-title">📱 Debug Console</div>
+        <div class="debug-controls">
+          <button onclick="clearDebugLog()">Clear</button>
+          <button onclick="toggleDebugPanel()">Hide</button>
+        </div>
+      </div>
+      <div class="debug-content" id="debug-content"></div>
+    </div>
+
     <script>
+      // 调试面板功能
+      function addDebugLog(message, type = "log") {
+        const debugContent = document.getElementById("debug-content");
+        const logDiv = document.createElement("div");
+        logDiv.className = `debug-log ${type}`;
+        
+        const timestamp = new Date().toLocaleTimeString();
+        const prefix = type === "error" ? "❌" : type === "warn" ? "⚠️" : "ℹ️";
+        logDiv.textContent = `[${timestamp}] ${prefix} ${message}`;
+        
+        debugContent.appendChild(logDiv);
+        // 自动滚动到底部
+        debugContent.scrollTop = debugContent.scrollHeight;
+        
+        // 限制日志数量，避免内存问题
+        const maxLogs = 200;
+        while (debugContent.children.length > maxLogs) {
+          debugContent.removeChild(debugContent.firstChild);
+        }
+      }
+
+      function clearDebugLog() {
+        document.getElementById("debug-content").innerHTML = "";
+        addDebugLog("Debug log cleared", "log");
+      }
+
+      function toggleDebugPanel() {
+        const panel = document.getElementById("debug-panel");
+        panel.classList.toggle("show");
+        const button = document.getElementById("debug-toggle");
+        button.textContent = panel.classList.contains("show") ? "🔍 Hide" : "🔍 Debug";
+      }
+
+      // 初始化调试面板
+      document.getElementById("debug-toggle").addEventListener("click", toggleDebugPanel);
+
+      // 拦截 console 方法
+      const originalLog = console.log;
+      const originalWarn = console.warn;
+      const originalError = console.error;
+
+      console.log = function(...args) {
+        originalLog.apply(console, args);
+        const message = args.map(arg => {
+          if (typeof arg === "object") {
+            try {
+              return JSON.stringify(arg, null, 2);
+            } catch {
+              return String(arg);
+            }
+          }
+          return String(arg);
+        }).join(" ");
+        addDebugLog(message, "log");
+      };
+
+      console.warn = function(...args) {
+        originalWarn.apply(console, args);
+        const message = args.map(arg => {
+          if (typeof arg === "object") {
+            try {
+              return JSON.stringify(arg, null, 2);
+            } catch {
+              return String(arg);
+            }
+          }
+          return String(arg);
+        }).join(" ");
+        addDebugLog(message, "warn");
+      };
+
+      console.error = function(...args) {
+        originalError.apply(console, args);
+        const message = args.map(arg => {
+          if (typeof arg === "object") {
+            try {
+              return JSON.stringify(arg, null, 2);
+            } catch {
+              return String(arg);
+            }
+          }
+          return String(arg);
+        }).join(" ");
+        addDebugLog(message, "error");
+      };
+
+      // 页面加载完成提示
+      addDebugLog("Debug console initialized", "log");
       const LOG_ENDPOINT =
         "https://script.google.com/macros/s/AKfycbzNSJAJ6JAO2Cx8m3wzev0DYXWYcXrUyIVMdSbW6BOiB4LP46BW5Rsyut9qT_qn9zE0/exec";
       const SDK_URL = "https://js.volumental.com/sdk/v1/volumental.js";
@@ -206,7 +395,7 @@
           // 强制从输入框获取最新的 email 值（确保获取到用户最新输入的值）
           const emailInput = document.getElementById("emailInput");
           let email = "";
-          
+
           // 优先从输入框获取（实时值）
           if (emailInput && emailInput.value) {
             email = emailInput.value.trim();
@@ -240,27 +429,43 @@
           };
 
           console.log("[Volumental] 📤 准备发送数据到 Apps Script");
-          console.log("[Volumental] 完整 payload:", JSON.stringify(payload, null, 2));
+          console.log(
+            "[Volumental] 完整 payload:",
+            JSON.stringify(payload, null, 2)
+          );
           console.log("[Volumental] Email 字段值:", payload.email);
           console.log("[Volumental] Email 字段类型:", typeof payload.email);
-          console.log("[Volumental] Email 字段长度:", payload.email ? payload.email.length : 0);
-          console.log("[Volumental] Email 是否为空:", !payload.email || payload.email === "");
+          console.log(
+            "[Volumental] Email 字段长度:",
+            payload.email ? payload.email.length : 0
+          );
+          console.log(
+            "[Volumental] Email 是否为空:",
+            !payload.email || payload.email === ""
+          );
           console.log("[Volumental] 目标 URL:", LOG_ENDPOINT);
 
           // 验证 payload 中的 email 字段
           const payloadString = JSON.stringify(payload);
           console.log("[Volumental] 序列化后的 JSON 字符串:", payloadString);
-          console.log("[Volumental] JSON 中是否包含 email 字段:", payloadString.includes('"email"'));
-          
+          console.log(
+            "[Volumental] JSON 中是否包含 email 字段:",
+            payloadString.includes('"email"')
+          );
+
           // 再次验证 email 输入框的值（发送前最后一次检查）
           const finalEmailCheck = emailInput ? emailInput.value.trim() : "";
           if (finalEmailCheck && finalEmailCheck !== payload.email) {
-            console.warn("[Volumental] ⚠️ 警告：输入框的 email 值与 payload 中的不一致！");
+            console.warn(
+              "[Volumental] ⚠️ 警告：输入框的 email 值与 payload 中的不一致！"
+            );
             console.warn("[Volumental] 输入框值:", finalEmailCheck);
             console.warn("[Volumental] Payload 值:", payload.email);
             // 更新 payload 中的 email
             payload.email = finalEmailCheck;
-            console.log("[Volumental] 已更新 payload 中的 email 为输入框的最新值");
+            console.log(
+              "[Volumental] 已更新 payload 中的 email 为输入框的最新值"
+            );
           }
 
           // 标记为已发送（在发送前标记，防止并发请求）
