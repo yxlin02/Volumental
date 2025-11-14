@@ -17,11 +17,43 @@
         background: #fff;
       }
       .wrap {
-        display: flex;
-        justify-content: center;
-        align-items: center;
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 24px 16px;
         min-height: 100vh;
-        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .email-form {
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+      }
+      .email-form label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: #333;
+        font-size: 16px;
+      }
+      .email-form input {
+        width: 100%;
+        padding: 12px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+      .email-form .note {
+        margin-top: 8px;
+        font-size: 14px;
+        color: #666;
+      }
+      .scan-button-container {
+        text-align: center;
       }
     </style>
   </head>
@@ -29,11 +61,26 @@
     <!-- Volumental Measurement Widget -->
 
     <div class="wrap">
-      <volumental-measurement
-        id="volumental-widget"
-        variant="outline"
-        measurement-on-widget="true"
-      ></volumental-measurement>
+      <h2 style="margin-top: 0; text-align: center;">Foot Measurement</h2>
+      
+      <div class="email-form">
+        <label for="emailInput">Email Address *</label>
+        <input
+          type="email"
+          id="emailInput"
+          placeholder="your.email@example.com"
+          required
+        />
+        <div class="note">Please enter your email to start the measurement.</div>
+      </div>
+      
+      <div class="scan-button-container">
+        <volumental-measurement
+          id="volumental-widget"
+          variant="outline"
+          measurement-on-widget="true"
+        ></volumental-measurement>
+      </div>
     </div>
 
     <script>
@@ -88,7 +135,15 @@
 
       // 获取 email 的辅助函数（从多个来源获取）
       function getEmail() {
-        // 1. 从 URL 参数获取（优先级最高）
+        // 1. 从 email 输入框获取（优先级最高）
+        const emailInput = document.getElementById("emailInput");
+        if (emailInput && emailInput.value.trim()) {
+          const email = emailInput.value.trim();
+          console.log("[Volumental] 从输入框获取 email:", email);
+          return email;
+        }
+
+        // 2. 从 URL 参数获取
         const urlParams = new URLSearchParams(window.location.search);
         const urlEmail = urlParams.get("email");
         if (urlEmail) {
@@ -96,21 +151,21 @@
           return urlEmail;
         }
 
-        // 2. 如果 URL 中有 subject 且看起来像 email，使用它
+        // 3. 如果 URL 中有 subject 且看起来像 email，使用它
         const urlSubject = urlParams.get("subject");
         if (urlSubject && urlSubject.includes("@")) {
           console.log("[Volumental] 从 subject 参数识别为 email:", urlSubject);
           return urlSubject;
         }
 
-        // 3. 从 localStorage 获取
+        // 4. 从 localStorage 获取
         const storedEmail = localStorage.getItem("volumental_email");
         if (storedEmail) {
           console.log("[Volumental] 从 localStorage 获取 email:", storedEmail);
           return storedEmail;
         }
 
-        // 4. 如果都没有，返回空字符串
+        // 5. 如果都没有，返回空字符串
         console.log("[Volumental] 未找到 email，将使用空值");
         return "";
       }
@@ -147,11 +202,29 @@
           return;
         }
 
-        // 获取 subject 并设置到 widget 元素上
-        const subject = getSubject();
+        // 获取 email 和 subject，并设置到 widget 元素上
+        const email = getEmail();
+        const subject = getSubject() || email; // 如果没有 subject，使用 email
+        
         if (subject) {
           element.setAttribute("subject", subject);
           console.log("[Volumental] ✅ 已设置 subject 到 widget:", subject);
+        }
+
+        // 监听 email 输入框变化，自动更新 widget 的 subject
+        const emailInput = document.getElementById("emailInput");
+        if (emailInput) {
+          function updateSubjectFromEmail() {
+            const emailValue = emailInput.value.trim();
+            if (emailValue) {
+              element.setAttribute("subject", emailValue);
+              console.log("[Volumental] 📧 Email 输入变化，已更新 subject:", emailValue);
+            } else {
+              element.removeAttribute("subject");
+            }
+          }
+          emailInput.addEventListener("input", updateSubjectFromEmail);
+          emailInput.addEventListener("blur", updateSubjectFromEmail);
         }
 
         console.log("[Volumental] ✅ 找到 widget 元素，开始设置事件监听器");
