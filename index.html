@@ -191,9 +191,7 @@
           name="email-address"
           placeholder="your.email@example.com"
           required
-          autocomplete="new-password"
-          data-lpignore="true"
-          data-form-type="other"
+          autocomplete="email"
         />
         <div class="note">
           Please enter your email to start the measurement.
@@ -328,83 +326,48 @@
       // 页面加载完成提示
       addDebugLog("Debug console initialized", "log");
 
-      // 确保 email 输入框始终为空，防止浏览器自动填充
-      function clearEmailInput() {
-        const emailInput = document.getElementById("emailInput");
-        if (emailInput) {
-          emailInput.value = "";
-          emailInput.setAttribute("autocomplete", "new-password");
-          addDebugLog("Email input cleared", "log");
-        }
-      }
-
-      // 防止自动填充的技巧：短暂设置为 readonly，然后移除
-      function preventAutofill() {
-        const emailInput = document.getElementById("emailInput");
-        if (emailInput) {
-          // 设置为 readonly 可以防止某些浏览器的自动填充
-          emailInput.setAttribute("readonly", "readonly");
-          emailInput.value = "";
-
-          // 延迟移除 readonly，让用户能够输入
-          setTimeout(function () {
-            emailInput.removeAttribute("readonly");
-            emailInput.focus();
-            emailInput.blur(); // 移除焦点，防止自动填充
-            addDebugLog("Autofill prevention applied", "log");
-          }, 100);
-        }
-      }
-
-      // 页面加载时清空并防止自动填充
-      function initEmailInput() {
-        clearEmailInput();
-        // 延迟执行防止自动填充，确保在浏览器尝试自动填充之后
-        setTimeout(preventAutofill, 200);
-      }
-
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", initEmailInput);
-      } else {
-        initEmailInput();
-      }
-
-      // 监听页面可见性变化，当页面重新显示时清空（防止某些浏览器的自动填充）
-      document.addEventListener("visibilitychange", function () {
-        if (!document.hidden) {
-          setTimeout(clearEmailInput, 100);
-        }
-      });
-
-      // 监听输入框的自动填充事件
+      // 允许 autofill，但确保能正确读取 autofill 的值
+      // 监听 autofill 完成事件，确保值被正确读取
       const emailInput = document.getElementById("emailInput");
       if (emailInput) {
         // 监听 autocomplete 事件（某些浏览器会触发）
         emailInput.addEventListener("autocomplete", function (e) {
-          addDebugLog("Autocomplete detected, clearing input", "warn");
-          clearEmailInput();
-        });
-
-        // 在获得焦点时检查并清空（某些浏览器会在焦点时自动填充）
-        let focusTimeout;
-        emailInput.addEventListener("focus", function (e) {
-          // 延迟检查，因为自动填充可能在焦点事件之后发生
-          focusTimeout = setTimeout(function () {
-            const value = emailInput.value;
-            // 如果输入框在获得焦点后立即有值（可能是自动填充），清空它
-            // 但只有在用户还没有开始输入的情况下
-            if (value && !emailInput.matches(":focus")) {
-              addDebugLog("Detected autofill on focus, clearing", "warn");
-              clearEmailInput();
-            }
-          }, 50);
-        });
-
-        emailInput.addEventListener("blur", function (e) {
-          if (focusTimeout) {
-            clearTimeout(focusTimeout);
+          addDebugLog(
+            "Autocomplete detected, email value: " + emailInput.value,
+            "log"
+          );
+          // 触发验证，确保按钮状态更新
+          if (emailInput.dispatchEvent) {
+            emailInput.dispatchEvent(new Event("input", { bubbles: true }));
           }
         });
+
+        // 监听 input 事件，确保 autofill 的值被正确捕获
+        emailInput.addEventListener("input", function (e) {
+          addDebugLog("Email input changed: " + emailInput.value, "log");
+        });
+
+        // 监听 change 事件（autofill 通常会触发 change 事件）
+        emailInput.addEventListener("change", function (e) {
+          addDebugLog(
+            "Email changed (possibly autofill): " + emailInput.value,
+            "log"
+          );
+        });
+
+        // 延迟检查 autofill（某些浏览器在页面加载后才会填充）
+        setTimeout(function () {
+          if (emailInput.value) {
+            addDebugLog(
+              "Detected autofilled email: " + emailInput.value,
+              "log"
+            );
+            // 触发验证，确保按钮状态更新
+            if (emailInput.dispatchEvent) {
+              emailInput.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+          }
+        }, 500);
       }
 
       const LOG_ENDPOINT =
@@ -417,6 +380,9 @@
       // 防重复提交：记录已发送的 scanId
       const sentScanIds = new Set();
       let isListenerSetup = false;
+      // 跟踪当前扫描会话：记录扫描开始时的 scanId，确保只上传本次扫描的 scanId
+      let currentScanSessionId = null;
+      let isScanInProgress = false;
 
       // 获取 email 的辅助函数（从多个来源获取）
       function getEmail() {
@@ -531,9 +497,14 @@
         // 初始化按钮状态
         updateScanButtonState();
 
-        // 监听 widget 打开事件 - 在打开时验证 email
+        // 监听 widget 打开事件 - 在打开时验证 email 并重置扫描会话
         element.addEventListener("volumental:on-opened", (e) => {
           console.log("[Volumental] 📱 扫描界面已打开");
+
+          // 重置扫描会话：清除之前的 scanId，标记新的扫描开始
+          currentScanSessionId = null;
+          isScanInProgress = true;
+          console.log("[Volumental] 🔄 新的扫描会话开始，已清除之前的 scanId");
 
           // 再次验证 email
           const emailInput = document.getElementById("emailInput");
@@ -563,20 +534,21 @@
               emailInput.focus();
             }
 
-            // 提示用户（使用更友好的方式）
-            setTimeout(() => {
-              // 尝试关闭扫描界面（如果 widget 支持）
-              // 注意：这取决于 Volumental widget 的实现
-              console.warn(
-                "[Volumental] ⚠️ 由于 email 无效，请先填写 email 地址"
-              );
-            }, 100);
+            // 重置扫描状态
+            isScanInProgress = false;
+            currentScanSessionId = null;
           }
         });
 
         // 监听 widget 关闭事件
         element.addEventListener("volumental:on-closed", () => {
           console.log("[Volumental] 📱 扫描界面已关闭");
+          // 如果扫描未完成就关闭，重置状态
+          if (isScanInProgress && !currentScanSessionId) {
+            console.log("[Volumental] 🔄 扫描被取消，重置状态");
+            isScanInProgress = false;
+            currentScanSessionId = null;
+          }
         });
 
         // 监听错误事件
@@ -594,17 +566,45 @@
           // 根据文档，数据在 e.detail 中，包含 { id } 字段
           const scanId = e.detail?.id || "";
 
-          // 防重复提交：如果这个 scanId 已经发送过，跳过
+          // 验证 scanId
           if (!scanId) {
             console.warn("[Volumental] ⚠️ scanId 为空，跳过发送");
             return;
           }
 
+          // 检查是否是本次扫描会话的 scanId
+          // 如果当前没有进行中的扫描，或者这个 scanId 不是本次会话的，跳过
+          if (!isScanInProgress) {
+            console.warn(
+              "[Volumental] ⚠️ 没有进行中的扫描会话，可能是缓存的 scanId，跳过:",
+              scanId
+            );
+            return;
+          }
+
+          // 如果这是本次会话的第一个 scanId，记录它
+          if (!currentScanSessionId) {
+            currentScanSessionId = scanId;
+            console.log("[Volumental] 📝 记录本次扫描会话的 scanId:", scanId);
+          } else if (currentScanSessionId !== scanId) {
+            // 如果 scanId 与本次会话的不一致，说明是旧的 scanId，跳过
+            console.warn(
+              "[Volumental] ⚠️ scanId 与本次会话不一致，可能是缓存的旧 scanId，跳过:",
+              scanId,
+              "当前会话 scanId:",
+              currentScanSessionId
+            );
+            return;
+          }
+
+          // 防重复提交：如果这个 scanId 已经发送过，跳过
           if (sentScanIds.has(scanId)) {
             console.warn(
               "[Volumental] ⚠️ scanId 已发送过，跳过重复提交:",
               scanId
             );
+            // 标记扫描完成
+            isScanInProgress = false;
             return;
           }
 
@@ -635,6 +635,11 @@
               });
               emailInput.focus();
             }
+
+            // 重置扫描状态，允许用户重新扫描
+            isScanInProgress = false;
+            currentScanSessionId = null;
+            console.log("[Volumental] 🔄 Email 无效，重置扫描状态");
 
             return; // 不发送数据
           }
@@ -787,7 +792,9 @@
                 "[Volumental] ✅ 数据发送成功！Apps Script 响应:",
                 result
               );
-              // 发送成功，保持标记（防止重复）
+              // 发送成功，标记扫描完成
+              isScanInProgress = false;
+              console.log("[Volumental] ✅ 扫描会话完成");
             })
             .catch((err) => {
               console.warn(
@@ -805,12 +812,15 @@
                   console.log(
                     "[Volumental] ⚠️ 使用 no-cors 模式发送（无法确认是否成功，但数据可能已送达）"
                   );
-                  // no-cors 模式下无法确认，但通常数据已送达，保持标记
+                  // no-cors 模式下无法确认，但通常数据已送达，标记扫描完成
+                  isScanInProgress = false;
                 })
                 .catch((e2) => {
                   console.error("[Volumental] ❌ 发送失败:", e2);
                   // 发送完全失败，移除标记，允许重试
                   sentScanIds.delete(scanId);
+                  isScanInProgress = false;
+                  currentScanSessionId = null;
                   console.log(
                     "[Volumental] 已移除 scanId 标记，允许重试:",
                     scanId
