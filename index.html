@@ -605,9 +605,7 @@
           // 重置扫描会话：清除之前的 scanId，标记新的扫描开始
           currentScanSessionId = null;
           isScanInProgress = true;
-          console.log(
-            "[Volumental] 🔄 新的扫描会话开始，已清除之前的 scanId"
-          );
+          console.log("[Volumental] 🔄 新的扫描会话开始，已清除之前的 scanId");
 
           // 再次验证 email
           const emailInput = document.getElementById("emailInput");
@@ -676,7 +674,7 @@
           }
 
           // 注意：scanId 重复检查完全由后端完成
-          
+
           // 前端检查：检查是否有进行中的扫描会话
           if (!isScanInProgress) {
             console.warn("[Volumental] ⚠️ 没有进行中的扫描会话，跳过:", scanId);
