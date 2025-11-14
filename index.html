@@ -869,7 +869,7 @@
                 `CORS failed, trying no-cors mode: ${err.message || err}`,
                 "warn"
               );
-              
+
               // 降级到 no-cors 模式
               // 注意：no-cors 模式下无法读取响应，但请求应该能发送
               fetch(LOG_ENDPOINT, {
@@ -888,7 +888,7 @@
                   );
                   // no-cors 模式下无法确认，但通常数据已送达，标记扫描完成
                   isScanInProgress = false;
-                  
+
                   // 提示用户检查后端
                   console.warn(
                     "[Volumental] ⚠️ 注意：由于 CORS 限制，无法确认数据是否成功保存。请检查 Google Sheet 确认数据是否已记录。"
