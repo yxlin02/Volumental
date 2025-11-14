@@ -42,31 +42,62 @@
       const SDK_URL = "https://js.volumental.com/sdk/v1/volumental.js";
       const CLIENT_ID = "f5b24fb9-1881-4998-a641-9f840056dcdd";
 
+      console.log("[Volumental] 开始加载 SDK...", { SDK_URL, CLIENT_ID });
+
       // 加载 SDK
       (function loadSdk() {
         const s = document.createElement("script");
         s.async = true;
         s.src = SDK_URL;
         s.setAttribute("data-client-id", CLIENT_ID);
+        s.onload = () => {
+          console.log("[Volumental] SDK 脚本文件加载成功");
+        };
+        s.onerror = () => {
+          console.error("[Volumental] SDK 脚本加载失败");
+        };
         document.body.appendChild(s);
       })();
 
       // 等待 SDK 加载完成后设置事件监听
       window.addEventListener("volumental:on-loaded", () => {
+        console.log("[Volumental] SDK 初始化完成，window.Volumental 已可用");
+
         // 找到 widget 元素
         const element = document.getElementById("volumental-widget");
         if (!element) {
-          console.error("Could not find volumental-measurement element");
+          console.error("[Volumental] ❌ 找不到 volumental-measurement 元素");
           return;
         }
 
+        console.log("[Volumental] ✅ 找到 widget 元素，开始设置事件监听器");
+
+        // 监听 widget 打开事件
+        element.addEventListener("volumental:on-opened", () => {
+          console.log("[Volumental] 📱 扫描界面已打开");
+        });
+
+        // 监听 widget 关闭事件
+        element.addEventListener("volumental:on-closed", () => {
+          console.log("[Volumental] 📱 扫描界面已关闭");
+        });
+
+        // 监听错误事件
+        element.addEventListener("volumental:on-error", (e) => {
+          console.error("[Volumental] ❌ 扫描错误:", e.detail?.message || "未知错误");
+        });
+
         // 根据文档，在元素上使用 addEventListener 监听事件
         element.addEventListener("volumental:on-measurement", (e) => {
+          console.log("[Volumental] ✅ 扫描完成！事件已触发", e.detail);
+
           // 根据文档，数据在 e.detail 中，包含 { id } 字段
           const scanId = e.detail?.id || "";
           // 从 widget 元素获取 subject 属性（如果设置了）
           const subject = element.getAttribute("subject") || "";
-          
+
+          console.log("[Volumental] 提取的数据:", { scanId, subject });
+
           const payload = {
             subject: subject,
             scanId: scanId,
@@ -75,6 +106,9 @@
             extra: e.detail || {},
           };
 
+          console.log("[Volumental] 📤 准备发送数据到 Apps Script:", payload);
+          console.log("[Volumental] 目标 URL:", LOG_ENDPOINT);
+
           // 发送数据到 Apps Script
           fetch(LOG_ENDPOINT, {
             method: "POST",
@@ -82,18 +116,40 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload),
           })
-            .then((res) => res.json())
-            .catch(() => {
+            .then((res) => {
+              console.log("[Volumental] 📥 收到响应，状态码:", res.status);
+              return res.json();
+            })
+            .then((result) => {
+              console.log("[Volumental] ✅ 数据发送成功！Apps Script 响应:", result);
+            })
+            .catch((err) => {
+              console.warn("[Volumental] ⚠️ CORS 模式失败，尝试 no-cors 模式:", err);
               // 降级到 no-cors 模式
               fetch(LOG_ENDPOINT, {
                 method: "POST",
                 mode: "no-cors",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
-              });
+              })
+                .then(() => {
+                  console.log("[Volumental] ⚠️ 使用 no-cors 模式发送（无法确认是否成功）");
+                })
+                .catch((e2) => {
+                  console.error("[Volumental] ❌ 发送失败:", e2);
+                });
             });
         });
+
+        console.log("[Volumental] ✅ 所有事件监听器已设置完成");
       });
+
+      // 超时检查
+      setTimeout(() => {
+        if (!window.Volumental) {
+          console.error("[Volumental] ❌ SDK 在 5 秒后仍未加载，可能存在问题");
+        }
+      }, 5000);
     </script>
 
     <noscript>需要启用 JavaScript 才能进行扫描。</noscript>
