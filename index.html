@@ -44,6 +44,10 @@
 
       console.log("[Volumental] 开始加载 SDK...", { SDK_URL, CLIENT_ID });
 
+      // 防重复提交：记录已发送的 scanId
+      const sentScanIds = new Set();
+      let isListenerSetup = false;
+
       // 加载 SDK
       (function loadSdk() {
         const s = document.createElement("script");
@@ -59,8 +63,14 @@
         document.body.appendChild(s);
       })();
 
-      // 等待 SDK 加载完成后设置事件监听
+      // 等待 SDK 加载完成后设置事件监听（只执行一次）
       window.addEventListener("volumental:on-loaded", () => {
+        // 防止重复设置监听器
+        if (isListenerSetup) {
+          console.warn("[Volumental] ⚠️ 事件监听器已设置，跳过重复设置");
+          return;
+        }
+        isListenerSetup = true;
         console.log("[Volumental] SDK 初始化完成，window.Volumental 已可用");
 
         // 找到 widget 元素
@@ -84,7 +94,10 @@
 
         // 监听错误事件
         element.addEventListener("volumental:on-error", (e) => {
-          console.error("[Volumental] ❌ 扫描错误:", e.detail?.message || "未知错误");
+          console.error(
+            "[Volumental] ❌ 扫描错误:",
+            e.detail?.message || "未知错误"
+          );
         });
 
         // 根据文档，在元素上使用 addEventListener 监听事件
@@ -93,6 +106,21 @@
 
           // 根据文档，数据在 e.detail 中，包含 { id } 字段
           const scanId = e.detail?.id || "";
+          
+          // 防重复提交：如果这个 scanId 已经发送过，跳过
+          if (!scanId) {
+            console.warn("[Volumental] ⚠️ scanId 为空，跳过发送");
+            return;
+          }
+          
+          if (sentScanIds.has(scanId)) {
+            console.warn(
+              "[Volumental] ⚠️ scanId 已发送过，跳过重复提交:",
+              scanId
+            );
+            return;
+          }
+
           // 从 widget 元素获取 subject 属性（如果设置了）
           const subject = element.getAttribute("subject") || "";
 
@@ -109,6 +137,9 @@
           console.log("[Volumental] 📤 准备发送数据到 Apps Script:", payload);
           console.log("[Volumental] 目标 URL:", LOG_ENDPOINT);
 
+          // 标记为已发送（在发送前标记，防止并发请求）
+          sentScanIds.add(scanId);
+
           // 发送数据到 Apps Script
           fetch(LOG_ENDPOINT, {
             method: "POST",
@@ -121,10 +152,17 @@
               return res.json();
             })
             .then((result) => {
-              console.log("[Volumental] ✅ 数据发送成功！Apps Script 响应:", result);
+              console.log(
+                "[Volumental] ✅ 数据发送成功！Apps Script 响应:",
+                result
+              );
+              // 发送成功，保持标记（防止重复）
             })
             .catch((err) => {
-              console.warn("[Volumental] ⚠️ CORS 模式失败，尝试 no-cors 模式:", err);
+              console.warn(
+                "[Volumental] ⚠️ CORS 模式失败，尝试 no-cors 模式:",
+                err
+              );
               // 降级到 no-cors 模式
               fetch(LOG_ENDPOINT, {
                 method: "POST",
@@ -133,10 +171,19 @@
                 body: JSON.stringify(payload),
               })
                 .then(() => {
-                  console.log("[Volumental] ⚠️ 使用 no-cors 模式发送（无法确认是否成功）");
+                  console.log(
+                    "[Volumental] ⚠️ 使用 no-cors 模式发送（无法确认是否成功，但数据可能已送达）"
+                  );
+                  // no-cors 模式下无法确认，但通常数据已送达，保持标记
                 })
                 .catch((e2) => {
                   console.error("[Volumental] ❌ 发送失败:", e2);
+                  // 发送完全失败，移除标记，允许重试
+                  sentScanIds.delete(scanId);
+                  console.log(
+                    "[Volumental] 已移除 scanId 标记，允许重试:",
+                    scanId
+                  );
                 });
             });
         });
