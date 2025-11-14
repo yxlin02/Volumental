@@ -63,7 +63,10 @@
         if (element) {
           const attrSubject = element.getAttribute("subject");
           if (attrSubject) {
-            console.log("[Volumental] 从 widget 属性获取 subject:", attrSubject);
+            console.log(
+              "[Volumental] 从 widget 属性获取 subject:",
+              attrSubject
+            );
             return attrSubject;
           }
         }
@@ -71,12 +74,44 @@
         // 3. 从 localStorage 获取
         const storedSubject = localStorage.getItem("volumental_subject");
         if (storedSubject) {
-          console.log("[Volumental] 从 localStorage 获取 subject:", storedSubject);
+          console.log(
+            "[Volumental] 从 localStorage 获取 subject:",
+            storedSubject
+          );
           return storedSubject;
         }
 
         // 4. 如果都没有，返回空字符串
         console.log("[Volumental] 未找到 subject，将使用空值");
+        return "";
+      }
+
+      // 获取 email 的辅助函数（从多个来源获取）
+      function getEmail() {
+        // 1. 从 URL 参数获取（优先级最高）
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlEmail = urlParams.get("email");
+        if (urlEmail) {
+          console.log("[Volumental] 从 URL 参数获取 email:", urlEmail);
+          return urlEmail;
+        }
+
+        // 2. 如果 URL 中有 subject 且看起来像 email，使用它
+        const urlSubject = urlParams.get("subject");
+        if (urlSubject && urlSubject.includes("@")) {
+          console.log("[Volumental] 从 subject 参数识别为 email:", urlSubject);
+          return urlSubject;
+        }
+
+        // 3. 从 localStorage 获取
+        const storedEmail = localStorage.getItem("volumental_email");
+        if (storedEmail) {
+          console.log("[Volumental] 从 localStorage 获取 email:", storedEmail);
+          return storedEmail;
+        }
+
+        // 4. 如果都没有，返回空字符串
+        console.log("[Volumental] 未找到 email，将使用空值");
         return "";
       }
 
@@ -160,13 +195,15 @@
             return;
           }
 
-          // 获取 subject（从多个来源）
+          // 获取 subject 和 email（从多个来源）
           const subject = getSubject();
+          const email = getEmail();
 
-          console.log("[Volumental] 提取的数据:", { scanId, subject });
+          console.log("[Volumental] 提取的数据:", { scanId, subject, email });
 
           const payload = {
             subject: subject,
+            email: email, // 添加 email 字段
             scanId: scanId,
             userAgent: navigator.userAgent,
             locale: navigator.language || "",
