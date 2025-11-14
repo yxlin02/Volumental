@@ -490,14 +490,48 @@
           const emailInput = document.getElementById("emailInput");
           let email = "";
 
-          // 优先从输入框获取（实时值）
-          if (emailInput && emailInput.value) {
-            email = emailInput.value.trim();
-            console.log("[Volumental] 从输入框获取 email（实时值）:", email);
+          // 优先从输入框获取（实时值）- 使用多种方式确保获取到值
+          if (emailInput) {
+            // 方法1: 直接读取 value
+            email = emailInput.value ? emailInput.value.trim() : "";
+
+            // 方法2: 如果 value 为空，尝试读取其他属性
+            if (!email && emailInput.getAttribute) {
+              const attrValue = emailInput.getAttribute("value");
+              if (attrValue) {
+                email = attrValue.trim();
+                console.log("[Volumental] 从 input 属性获取 email:", email);
+              }
+            }
+
+            // 方法3: 如果还是为空，尝试从其他来源获取
+            if (!email) {
+              email = getEmail();
+              console.log("[Volumental] 从其他来源获取 email:", email);
+            } else {
+              console.log("[Volumental] 从输入框获取 email（实时值）:", email);
+            }
           } else {
-            // 如果输入框为空，尝试从其他来源获取
+            // 如果找不到输入框，使用 getEmail() 函数
             email = getEmail();
-            console.log("[Volumental] 从其他来源获取 email:", email);
+            console.log(
+              "[Volumental] 找不到输入框，从其他来源获取 email:",
+              email
+            );
+          }
+
+          // 最终验证：如果 email 还是为空，尝试再次从输入框读取
+          if (!email && emailInput) {
+            // 延迟一点再读取（某些情况下值可能还没更新）
+            setTimeout(() => {
+              const delayedEmail = emailInput.value
+                ? emailInput.value.trim()
+                : "";
+              if (delayedEmail && !email) {
+                console.warn("[Volumental] ⚠️ 延迟读取到 email:", delayedEmail);
+                // 注意：这里不能更新 email，因为已经发送了，但可以记录日志
+              }
+            }, 100);
           }
 
           // 验证 email 是否有效
@@ -549,7 +583,13 @@
 
           // 再次验证 email 输入框的值（发送前最后一次检查）
           const finalEmailCheck = emailInput ? emailInput.value.trim() : "";
-          if (finalEmailCheck && finalEmailCheck !== payload.email) {
+
+          // 如果最终检查发现 email 为空，但之前有值，使用最终检查的值
+          if (!finalEmailCheck && payload.email) {
+            console.warn(
+              "[Volumental] ⚠️ 警告：最终检查时 email 为空，但 payload 中有值"
+            );
+          } else if (finalEmailCheck && finalEmailCheck !== payload.email) {
             console.warn(
               "[Volumental] ⚠️ 警告：输入框的 email 值与 payload 中的不一致！"
             );
@@ -560,7 +600,20 @@
             console.log(
               "[Volumental] 已更新 payload 中的 email 为输入框的最新值"
             );
+          } else if (finalEmailCheck && !payload.email) {
+            // 如果最终检查有值但 payload 中没有，更新 payload
+            console.warn(
+              "[Volumental] ⚠️ 警告：最终检查发现 email，但 payload 中为空，更新 payload"
+            );
+            payload.email = finalEmailCheck;
           }
+
+          // 最终确认 email 值
+          console.log("[Volumental] 📧 最终发送的 email 值:", payload.email);
+          console.log(
+            "[Volumental] 📧 Email 是否为空:",
+            !payload.email || payload.email === ""
+          );
 
           // 标记为已发送（在发送前标记，防止并发请求）
           sentScanIds.add(scanId);
