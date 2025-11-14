@@ -719,20 +719,14 @@
 
           // 前端检查 3：检查是否有进行中的扫描会话
           if (!isScanInProgress) {
-            console.warn(
-              "[Volumental] ⚠️ 没有进行中的扫描会话，跳过:",
-              scanId
-            );
+            console.warn("[Volumental] ⚠️ 没有进行中的扫描会话，跳过:", scanId);
             return;
           }
 
           // 前端检查 4：记录本次会话的 scanId（用于后续验证）
           if (!currentScanSessionId) {
             currentScanSessionId = scanId;
-            console.log(
-              "[Volumental] 📝 记录本次扫描会话的 scanId:",
-              scanId
-            );
+            console.log("[Volumental] 📝 记录本次扫描会话的 scanId:", scanId);
           } else if (currentScanSessionId !== scanId) {
             // 如果 scanId 与本次会话的不一致，跳过
             console.warn(
@@ -847,7 +841,7 @@
                 "[Volumental] ✅ 数据发送成功！Apps Script 响应:",
                 result
               );
-              
+
               // 检查后端是否返回 skipped（scanId 已存在于数据库中）
               if (result && result.skipped) {
                 console.warn(
@@ -863,7 +857,7 @@
                 // 发送成功，标记扫描完成
                 console.log("[Volumental] ✅ 扫描会话完成");
               }
-              
+
               isScanInProgress = false;
             })
             .catch((err) => {
