@@ -471,10 +471,6 @@
       // 跟踪当前扫描会话：记录扫描开始时的 scanId，确保只上传本次扫描的 scanId
       let currentScanSessionId = null;
       let isScanInProgress = false;
-      // 记录 widget 打开的时间戳，用于过滤缓存的旧 scanId
-      let widgetOpenedTimestamp = null;
-      // 在 widget 打开后的这个时间窗口内（毫秒），忽略所有 measurement 事件（可能是缓存的）
-      const CACHE_IGNORE_WINDOW_MS = 3000; // 3 秒
       // 已确认的 email（通过表单提交确认）
       let confirmedEmail = null;
 
@@ -609,11 +605,8 @@
           // 重置扫描会话：清除之前的 scanId，标记新的扫描开始
           currentScanSessionId = null;
           isScanInProgress = true;
-          // 记录打开时间戳，用于过滤缓存的旧 scanId
-          widgetOpenedTimestamp = Date.now();
           console.log(
-            "[Volumental] 🔄 新的扫描会话开始，已清除之前的 scanId，时间戳:",
-            widgetOpenedTimestamp
+            "[Volumental] 🔄 新的扫描会话开始，已清除之前的 scanId"
           );
 
           // 再次验证 email
@@ -659,8 +652,6 @@
             isScanInProgress = false;
             currentScanSessionId = null;
           }
-          // 清除时间戳
-          widgetOpenedTimestamp = null;
         });
 
         // 监听错误事件
@@ -684,42 +675,22 @@
             return;
           }
 
-          // 前端检查：检查是否是缓存的旧 scanId（在 widget 打开后的短时间内触发）
-          // 注意：scanId 重复检查由后端完成
-          const now = Date.now();
-          if (
-            widgetOpenedTimestamp &&
-            now - widgetOpenedTimestamp < CACHE_IGNORE_WINDOW_MS
-          ) {
-            console.warn(
-              "[Volumental] ⚠️ 检测到缓存的旧 scanId（在打开后",
-              now - widgetOpenedTimestamp,
-              "ms 内触发），跳过:",
-              scanId
-            );
-            addDebugLog(
-              `Ignoring cached scanId ${scanId} (triggered ${
-                now - widgetOpenedTimestamp
-              }ms after widget opened)`,
-              "warn"
-            );
-            return;
-          }
-
-          // 前端检查 3：检查是否有进行中的扫描会话
+          // 注意：scanId 重复检查完全由后端完成
+          
+          // 前端检查：检查是否有进行中的扫描会话
           if (!isScanInProgress) {
             console.warn("[Volumental] ⚠️ 没有进行中的扫描会话，跳过:", scanId);
             return;
           }
 
-          // 前端检查 4：记录本次会话的 scanId（用于后续验证）
+          // 记录本次会话的 scanId（用于确保是本次扫描的 scanId）
           if (!currentScanSessionId) {
             currentScanSessionId = scanId;
             console.log("[Volumental] 📝 记录本次扫描会话的 scanId:", scanId);
           } else if (currentScanSessionId !== scanId) {
-            // 如果 scanId 与本次会话的不一致，跳过
+            // 如果 scanId 与本次会话的不一致，可能是缓存的旧 scanId，跳过
             console.warn(
-              "[Volumental] ⚠️ scanId 与本次会话不一致，跳过:",
+              "[Volumental] ⚠️ scanId 与本次会话不一致，可能是缓存的旧 scanId，跳过:",
               scanId,
               "当前会话 scanId:",
               currentScanSessionId
