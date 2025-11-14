@@ -156,8 +156,12 @@
         <input
           type="email"
           id="emailInput"
+          name="email-address"
           placeholder="your.email@example.com"
           required
+          autocomplete="new-password"
+          data-lpignore="true"
+          data-form-type="other"
         />
         <div class="note">
           Please enter your email to start the measurement.
@@ -192,15 +196,15 @@
         const debugContent = document.getElementById("debug-content");
         const logDiv = document.createElement("div");
         logDiv.className = `debug-log ${type}`;
-        
+
         const timestamp = new Date().toLocaleTimeString();
         const prefix = type === "error" ? "❌" : type === "warn" ? "⚠️" : "ℹ️";
         logDiv.textContent = `[${timestamp}] ${prefix} ${message}`;
-        
+
         debugContent.appendChild(logDiv);
         // 自动滚动到底部
         debugContent.scrollTop = debugContent.scrollHeight;
-        
+
         // 限制日志数量，避免内存问题
         const maxLogs = 200;
         while (debugContent.children.length > maxLogs) {
@@ -217,64 +221,154 @@
         const panel = document.getElementById("debug-panel");
         panel.classList.toggle("show");
         const button = document.getElementById("debug-toggle");
-        button.textContent = panel.classList.contains("show") ? "🔍 Hide" : "🔍 Debug";
+        button.textContent = panel.classList.contains("show")
+          ? "🔍 Hide"
+          : "🔍 Debug";
       }
 
       // 初始化调试面板
-      document.getElementById("debug-toggle").addEventListener("click", toggleDebugPanel);
+      document
+        .getElementById("debug-toggle")
+        .addEventListener("click", toggleDebugPanel);
 
       // 拦截 console 方法
       const originalLog = console.log;
       const originalWarn = console.warn;
       const originalError = console.error;
 
-      console.log = function(...args) {
+      console.log = function (...args) {
         originalLog.apply(console, args);
-        const message = args.map(arg => {
-          if (typeof arg === "object") {
-            try {
-              return JSON.stringify(arg, null, 2);
-            } catch {
-              return String(arg);
+        const message = args
+          .map((arg) => {
+            if (typeof arg === "object") {
+              try {
+                return JSON.stringify(arg, null, 2);
+              } catch {
+                return String(arg);
+              }
             }
-          }
-          return String(arg);
-        }).join(" ");
+            return String(arg);
+          })
+          .join(" ");
         addDebugLog(message, "log");
       };
 
-      console.warn = function(...args) {
+      console.warn = function (...args) {
         originalWarn.apply(console, args);
-        const message = args.map(arg => {
-          if (typeof arg === "object") {
-            try {
-              return JSON.stringify(arg, null, 2);
-            } catch {
-              return String(arg);
+        const message = args
+          .map((arg) => {
+            if (typeof arg === "object") {
+              try {
+                return JSON.stringify(arg, null, 2);
+              } catch {
+                return String(arg);
+              }
             }
-          }
-          return String(arg);
-        }).join(" ");
+            return String(arg);
+          })
+          .join(" ");
         addDebugLog(message, "warn");
       };
 
-      console.error = function(...args) {
+      console.error = function (...args) {
         originalError.apply(console, args);
-        const message = args.map(arg => {
-          if (typeof arg === "object") {
-            try {
-              return JSON.stringify(arg, null, 2);
-            } catch {
-              return String(arg);
+        const message = args
+          .map((arg) => {
+            if (typeof arg === "object") {
+              try {
+                return JSON.stringify(arg, null, 2);
+              } catch {
+                return String(arg);
+              }
             }
-          }
-          return String(arg);
-        }).join(" ");
+            return String(arg);
+          })
+          .join(" ");
         addDebugLog(message, "error");
       };
 
       // 页面加载完成提示
       addDebugLog("Debug console initialized", "log");
+
+      // 确保 email 输入框始终为空，防止浏览器自动填充
+      function clearEmailInput() {
+        const emailInput = document.getElementById("emailInput");
+        if (emailInput) {
+          emailInput.value = "";
+          emailInput.setAttribute("autocomplete", "new-password");
+          addDebugLog("Email input cleared", "log");
+        }
+      }
+
+      // 防止自动填充的技巧：短暂设置为 readonly，然后移除
+      function preventAutofill() {
+        const emailInput = document.getElementById("emailInput");
+        if (emailInput) {
+          // 设置为 readonly 可以防止某些浏览器的自动填充
+          emailInput.setAttribute("readonly", "readonly");
+          emailInput.value = "";
+          
+          // 延迟移除 readonly，让用户能够输入
+          setTimeout(function () {
+            emailInput.removeAttribute("readonly");
+            emailInput.focus();
+            emailInput.blur(); // 移除焦点，防止自动填充
+            addDebugLog("Autofill prevention applied", "log");
+          }, 100);
+        }
+      }
+
+      // 页面加载时清空并防止自动填充
+      function initEmailInput() {
+        clearEmailInput();
+        // 延迟执行防止自动填充，确保在浏览器尝试自动填充之后
+        setTimeout(preventAutofill, 200);
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initEmailInput);
+      } else {
+        initEmailInput();
+      }
+
+      // 监听页面可见性变化，当页面重新显示时清空（防止某些浏览器的自动填充）
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) {
+          setTimeout(clearEmailInput, 100);
+        }
+      });
+
+      // 监听输入框的自动填充事件
+      const emailInput = document.getElementById("emailInput");
+      if (emailInput) {
+        // 监听 autocomplete 事件（某些浏览器会触发）
+        emailInput.addEventListener("autocomplete", function (e) {
+          addDebugLog("Autocomplete detected, clearing input", "warn");
+          clearEmailInput();
+        });
+
+        // 在获得焦点时检查并清空（某些浏览器会在焦点时自动填充）
+        let focusTimeout;
+        emailInput.addEventListener("focus", function (e) {
+          // 延迟检查，因为自动填充可能在焦点事件之后发生
+          focusTimeout = setTimeout(function () {
+            const value = emailInput.value;
+            // 如果输入框在获得焦点后立即有值（可能是自动填充），清空它
+            // 但只有在用户还没有开始输入的情况下
+            if (value && !emailInput.matches(":focus")) {
+              addDebugLog("Detected autofill on focus, clearing", "warn");
+              clearEmailInput();
+            }
+          }, 50);
+        });
+
+        emailInput.addEventListener("blur", function (e) {
+          if (focusTimeout) {
+            clearTimeout(focusTimeout);
+          }
+        });
+      }
+
       const LOG_ENDPOINT =
         "https://script.google.com/macros/s/AKfycbzNSJAJ6JAO2Cx8m3wzev0DYXWYcXrUyIVMdSbW6BOiB4LP46BW5Rsyut9qT_qn9zE0/exec";
       const SDK_URL = "https://js.volumental.com/sdk/v1/volumental.js";
