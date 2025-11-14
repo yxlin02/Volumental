@@ -686,17 +686,17 @@
             return;
           }
 
-          // 首先检查：如果这个 scanId 已经发送过，直接忽略（无论何时触发，都是重复的）
+          // 前端检查 1：如果这个 scanId 已经发送过（同一页面会话中），直接忽略
           if (sentScanIds.has(scanId)) {
             console.warn(
-              "[Volumental] ⚠️ scanId 已发送过（可能是缓存的旧 scanId），跳过:",
+              "[Volumental] ⚠️ scanId 已在本页面会话中发送过，跳过:",
               scanId
             );
             addDebugLog(`Ignoring already sent scanId ${scanId}`, "warn");
             return;
           }
 
-          // 检查是否是缓存的旧 scanId：如果在 widget 打开后的短时间内触发，可能是缓存的
+          // 前端检查 2：检查是否是缓存的旧 scanId（在 widget 打开后的短时间内触发）
           const now = Date.now();
           if (
             widgetOpenedTimestamp &&
@@ -717,36 +717,35 @@
             return;
           }
 
-          // 检查是否是本次扫描会话的 scanId
-          // 如果当前没有进行中的扫描，或者这个 scanId 不是本次会话的，跳过
+          // 前端检查 3：检查是否有进行中的扫描会话
           if (!isScanInProgress) {
             console.warn(
-              "[Volumental] ⚠️ 没有进行中的扫描会话，可能是缓存的 scanId，跳过:",
+              "[Volumental] ⚠️ 没有进行中的扫描会话，跳过:",
               scanId
             );
             return;
           }
 
-          // 如果这是本次会话的第一个 scanId，记录它
+          // 前端检查 4：记录本次会话的 scanId（用于后续验证）
           if (!currentScanSessionId) {
             currentScanSessionId = scanId;
             console.log(
               "[Volumental] 📝 记录本次扫描会话的 scanId:",
-              scanId,
-              "（在打开后",
-              now - widgetOpenedTimestamp,
-              "ms 后触发）"
+              scanId
             );
           } else if (currentScanSessionId !== scanId) {
-            // 如果 scanId 与本次会话的不一致，说明是旧的 scanId，跳过
+            // 如果 scanId 与本次会话的不一致，跳过
             console.warn(
-              "[Volumental] ⚠️ scanId 与本次会话不一致，可能是缓存的旧 scanId，跳过:",
+              "[Volumental] ⚠️ scanId 与本次会话不一致，跳过:",
               scanId,
               "当前会话 scanId:",
               currentScanSessionId
             );
             return;
           }
+
+          // 注意：后端会进行最终检查（检查数据库中是否已存在 scanId）
+          // 如果后端返回 skipped: true，说明 scanId 已存在于数据库中
 
           // 在发送前再次验证 email（优先使用已确认的 email）
           let email = confirmedEmail || getEmail();
@@ -848,9 +847,24 @@
                 "[Volumental] ✅ 数据发送成功！Apps Script 响应:",
                 result
               );
-              // 发送成功，标记扫描完成
+              
+              // 检查后端是否返回 skipped（scanId 已存在于数据库中）
+              if (result && result.skipped) {
+                console.warn(
+                  "[Volumental] ⚠️ 后端检测到 scanId 已存在于数据库中，跳过:",
+                  scanId
+                );
+                addDebugLog(
+                  `Backend detected duplicate scanId ${scanId}, skipped`,
+                  "warn"
+                );
+                // 即使后端跳过，也保持 sentScanIds 标记，防止重复提交
+              } else {
+                // 发送成功，标记扫描完成
+                console.log("[Volumental] ✅ 扫描会话完成");
+              }
+              
               isScanInProgress = false;
-              console.log("[Volumental] ✅ 扫描会话完成");
             })
             .catch((err) => {
               console.warn(
